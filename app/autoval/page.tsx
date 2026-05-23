@@ -16,9 +16,9 @@ interface Message {
   steps?: EvalStep[]
 }
 
-const TOOL_LABELS: Record<string, { icon: string; label: string; color: string }> = {
-  query_clickhouse: { icon: '🔍', label: 'Query ClickHouse', color: '#EDF2FF' },
-  nimble_web_search: { icon: '🌐', label: 'Web Search (Nimble)', color: '#FFF4E6' },
+const TOOL_LABELS: Record<string, { icon: string; label: string; color: string; logoSrc?: string }> = {
+  query_clickhouse: { icon: '🔍', label: 'Query ClickHouse', color: '#EDF2FF', logoSrc: '/clickhouse-small.png' },
+  nimble_web_search: { icon: '🌐', label: 'Web Search (Nimble)', color: '#FFF4E6', logoSrc: '/nimble.png' },
   judge_output: { icon: '⚖️', label: 'Judge Output', color: '#F3F0FF' },
   generate_safety_rule: { icon: '📝', label: 'Generate Safety Rule', color: '#EBFBEE' },
   test_prompt_fix: { icon: '🔧', label: 'Test Prompt Fix', color: '#FFF9DB' },
@@ -26,7 +26,7 @@ const TOOL_LABELS: Record<string, { icon: string; label: string; color: string }
   read_evals: { icon: '📋', label: 'Read Safety Rules', color: '#F3F0FF' },
   check_open_prs: { icon: '🔎', label: 'Check Open PRs', color: '#EDF2FF' },
   create_pull_request: { icon: '🚀', label: 'Create Pull Request', color: '#FFF4E6' },
-  scan_recent_logs: { icon: '📊', label: 'Scan Recent Logs', color: '#EDF2FF' },
+  scan_recent_logs: { icon: '📊', label: 'Scan Recent Logs', color: '#EDF2FF', logoSrc: '/clickhouse-small.png' },
   complete_run: { icon: '✅', label: 'Complete', color: '#EBFBEE' },
 }
 
@@ -67,7 +67,11 @@ function StepCard({ step }: { step: EvalStep }) {
       onClick={() => setExpanded(!expanded)}
     >
       <div className="flex items-center gap-3 px-3 py-2" style={{ background: info.color }}>
-        <span className="text-[14px]">{info.icon}</span>
+        {info.logoSrc ? (
+          <img src={info.logoSrc} alt="" className="h-[16px] w-[16px] object-contain" />
+        ) : (
+          <span className="text-[14px]">{info.icon}</span>
+        )}
         <span className="text-[13px] font-semibold text-[#333] flex-1">{info.label}</span>
         {hasResults && (
           <span className={`text-[11px] font-bold ${testResults.results!.failed === 0 ? 'text-[#2B8A3E]' : 'text-[#C92A2A]'}`}>
@@ -319,12 +323,12 @@ export default function AutovalPage() {
               ))}
             </div>
             <div className="mt-16">
-              <p className="text-[11px] uppercase tracking-[0.1em] text-[#ccc] mb-4">Powered by</p>
-              <div className="flex items-center justify-center gap-8">
-                <img src="/clickhouse.png" alt="ClickHouse" className="h-[24px] opacity-40 hover:opacity-70 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                <img src="/datadog.png" alt="Datadog" className="h-[24px] opacity-40 hover:opacity-70 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                <img src="/nimble.png" alt="Nimble" className="h-[24px] opacity-40 hover:opacity-70 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                <img src="/gemini.png" alt="Gemini" className="h-[24px] opacity-40 hover:opacity-70 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <p className="text-[11px] uppercase tracking-[0.1em] text-[#ccc] mb-5">Powered by</p>
+              <div className="flex items-center justify-center gap-10">
+                <a href="https://clickhouse.com" target="_blank" rel="noopener"><img src="/clickhouse-small.png" alt="ClickHouse" className="h-[36px] object-contain opacity-50 hover:opacity-80 transition-opacity" /></a>
+                <a href="https://datadoghq.com" target="_blank" rel="noopener"><img src="/datadog.png" alt="Datadog" className="h-[36px] object-contain opacity-50 hover:opacity-80 transition-opacity" /></a>
+                <a href="https://nimbleway.com" target="_blank" rel="noopener"><img src="/nimble.png" alt="Nimble" className="h-[36px] object-contain opacity-50 hover:opacity-80 transition-opacity" /></a>
+                <a href="https://deepmind.google/technologies/gemini" target="_blank" rel="noopener"><img src="/gemini.png" alt="Gemini" className="h-[36px] object-contain opacity-50 hover:opacity-80 transition-opacity" /></a>
               </div>
             </div>
           </div>
