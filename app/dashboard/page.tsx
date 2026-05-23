@@ -73,7 +73,10 @@ export default function DashboardPage() {
         <h1 className="text-[18px] font-bold">Autoval</h1>
         <span className="text-[12px] text-[#bbb]">dashboard</span>
         <div className="flex-1" />
-        <Link href="/autoval" className="text-[13px] text-[#666] hover:text-[#111]">
+        <Link href="/safety-rules" className="text-[13px] text-[#666] hover:text-[#111]">
+          Safety Rules
+        </Link>
+        <Link href="/autoval" className="text-[13px] text-[#666] hover:text-[#111] ml-4">
           Agent Chat
         </Link>
       </div>

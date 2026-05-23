@@ -119,6 +119,9 @@ export default function RunDetailPage() {
         <Link href="/dashboard" className="text-[13px] text-[#666] hover:text-[#111]">
           All Runs
         </Link>
+        <Link href="/safety-rules" className="text-[13px] text-[#666] hover:text-[#111] ml-4">
+          Safety Rules
+        </Link>
         <Link href="/autoval" className="text-[13px] text-[#666] hover:text-[#111] ml-4">
           Agent Chat
         </Link>
