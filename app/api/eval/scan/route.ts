@@ -7,9 +7,9 @@ import { createRun, insertStep, completeRun } from '@/lib/persistRun'
 // Scan for unscored logs and run the agent on each
 export async function POST() {
   try {
-    // Fetch all logs from last 6 hours
+    // Fetch recent logs (limit to 5 to keep context manageable for Gemini)
     const rows = await queryLogs(
-      'SELECT * FROM autoval.llm_call_logs WHERE timestamp > now() - INTERVAL 6 HOUR ORDER BY timestamp DESC LIMIT 50'
+      'SELECT * FROM autoval.llm_call_logs WHERE timestamp > now() - INTERVAL 6 HOUR ORDER BY timestamp DESC LIMIT 5'
     ) as Record<string, unknown>[]
 
     if (!rows || rows.length === 0) {
@@ -21,12 +21,12 @@ export async function POST() {
 
     const summaries: string[] = []
 
-    // Run the agent with the found rows as context
+    // Run the agent with the found rows as context (truncate to avoid overwhelming Gemini)
     const rowSummary = rows.map((r) =>
-      `ID: ${r.id}\nInput: ${String(r.input).slice(0, 200)}\nOutput: ${String(r.output).slice(0, 200)}`
+      `ID: ${r.id}\nInput: ${String(r.input).slice(0, 100)}\nOutput: ${String(r.output).slice(0, 150)}`
     ).join('\n---\n')
 
-    const message = `Here are ${rows.length} recent log entries from the last 6 hours. Please review each one for quality issues:\n\n${rowSummary}`
+    const message = `Review these ${rows.length} recent LLM call logs for quality issues. Investigate any problematic outputs:\n\n${rowSummary}`
 
     try {
       for await (const step of runEvalAgent(message, [])) {
