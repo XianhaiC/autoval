@@ -82,7 +82,14 @@ export default function RunDetailPage() {
         supabase.from('eval_steps').select('*').eq('run_id', runId).order('created_at', { ascending: true }),
       ])
       setRun(runRes.data)
-      setSteps(stepsRes.data || [])
+      // Dedup consecutive steps with same tool_name + duration
+      const raw: EvalStep[] = stepsRes.data || []
+      const deduped = raw.filter((s, i) => {
+        if (i === 0) return true
+        const prev = raw[i - 1]
+        return !(s.tool_name === prev.tool_name && s.duration_ms === prev.duration_ms)
+      })
+      setSteps(deduped)
       setLoading(false)
     }
     fetchData()

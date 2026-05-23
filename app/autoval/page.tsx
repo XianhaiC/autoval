@@ -161,11 +161,19 @@ export default function AutovalPage() {
               return updated
             })
           } else if (data.tool_name) {
-            // It's a step
+            // It's a step — dedup consecutive same-name+same-duration
             setMessages((prev) => {
               const updated = [...prev]
               const msg = updated[agentMsgIndex]
-              if (msg) msg.steps = [...(msg.steps || []), data as EvalStep]
+              if (msg) {
+                const existing = msg.steps || []
+                const last = existing[existing.length - 1]
+                const step = data as EvalStep
+                if (last && last.tool_name === step.tool_name && last.duration_ms === step.duration_ms) {
+                  return prev // skip duplicate
+                }
+                msg.steps = [...existing, step]
+              }
               return updated
             })
           }
