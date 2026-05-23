@@ -3,11 +3,20 @@ import { executeReadPrompt, executeReadEvals } from './createPR'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
+interface Assertion {
+  type: string
+  value: string
+}
+
 interface EvalRule {
-  name: string
-  test_input: string
+  name?: string
+  // Our format
+  test_input?: string
   must_not_contain?: string
   must_contain?: string
+  // Daniel's format
+  input?: string
+  assertions?: Assertion[]
 }
 
 interface EvalResult {
@@ -20,8 +29,6 @@ export async function executeTestPromptFix(args: { prompt_addition: string }) {
   // 1. Read current prompt from GitHub
   const promptResult = await executeReadPrompt()
   const currentPrompt = 'content' in promptResult ? promptResult.content : ''
-
-  // Build the new prompt
   const newPrompt = currentPrompt + '\n\n' + args.prompt_addition
 
   // 2. Read existing eval rules from GitHub
@@ -42,35 +49,56 @@ export async function executeTestPromptFix(args: { prompt_addition: string }) {
   const details: EvalResult[] = []
 
   for (const rule of evals) {
-    if (!rule.test_input) continue
+    // Support both formats: test_input (ours) or input (Daniel's)
+    const testInput = rule.test_input || rule.input
+    if (!testInput) continue
 
     try {
       const result = await model.generateContent({
         systemInstruction: newPrompt,
-        contents: [{ role: 'user', parts: [{ text: rule.test_input }] }],
+        contents: [{ role: 'user', parts: [{ text: testInput }] }],
       })
       const output = result.response.text().toLowerCase()
 
       let passed = true
-      let reason = 'Passed'
+      const reasons: string[] = []
 
+      // Check top-level must_contain / must_not_contain (our format)
       if (rule.must_not_contain) {
-        const forbidden = rule.must_not_contain.toLowerCase()
-        if (output.includes(forbidden)) {
+        if (output.includes(rule.must_not_contain.toLowerCase())) {
           passed = false
-          reason = `Output contains forbidden term: "${rule.must_not_contain}"`
+          reasons.push(`Contains forbidden: "${rule.must_not_contain}"`)
         }
       }
-
       if (rule.must_contain) {
-        const required = rule.must_contain.toLowerCase()
-        if (!output.includes(required)) {
+        if (!output.includes(rule.must_contain.toLowerCase())) {
           passed = false
-          reason = `Output missing required term: "${rule.must_contain}"`
+          reasons.push(`Missing required: "${rule.must_contain}"`)
         }
       }
 
-      details.push({ name: rule.name || 'unnamed', passed, reason })
+      // Check assertions array (Daniel's format)
+      if (rule.assertions) {
+        for (const a of rule.assertions) {
+          if (a.type === 'must_not_contain') {
+            if (output.includes(a.value.toLowerCase())) {
+              passed = false
+              reasons.push(`Contains forbidden: "${a.value}"`)
+            }
+          } else if (a.type === 'must_contain') {
+            if (!output.includes(a.value.toLowerCase())) {
+              passed = false
+              reasons.push(`Missing required: "${a.value}"`)
+            }
+          }
+        }
+      }
+
+      details.push({
+        name: rule.name || 'unnamed',
+        passed,
+        reason: passed ? 'Passed' : reasons.join('; '),
+      })
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error'
       details.push({ name: rule.name || 'unnamed', passed: false, reason: `Error: ${msg}` })

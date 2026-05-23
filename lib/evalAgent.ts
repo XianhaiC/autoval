@@ -8,7 +8,7 @@ import {
 } from '@google/generative-ai'
 import { executeQueryClickhouse } from '@/lib/tools/queryClickhouse'
 import { executeNimbleSearch } from '@/lib/tools/nimbleSearch'
-import { executeCreatePR, executeReadPrompt, executeReadEvals } from '@/lib/tools/createPR'
+import { executeCreatePR, executeReadPrompt, executeReadEvals, executeCheckOpenPRs } from '@/lib/tools/createPR'
 import { executeTestPromptFix } from '@/lib/tools/runEvals'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
@@ -28,8 +28,9 @@ Your job:
 5. Create a safety rule that prevents this from happening again (generate_safety_rule)
 6. Read existing safety rules (read_evals) and test a prompt fix against ALL of them (test_prompt_fix)
 7. CRITICAL: Check test_prompt_fix results. If ANY existing evals FAIL (regressions), do NOT create a PR. Instead, iterate on the prompt fix and re-test until all evals pass with 0 regressions.
-8. Only submit a PR (create_pull_request) when test_prompt_fix shows ALL evals passing.
-9. Call complete_run when done
+8. Before creating a PR, call check_open_prs to see if there are already open Autoval PRs. If a similar fix already exists, skip PR creation and note it in the summary.
+9. Only submit a PR (create_pull_request) when test_prompt_fix shows ALL evals passing AND no duplicate PR exists.
+10. Call complete_run when done
 
 Always ground judgments in web evidence for medical, legal, or factual claims. Search first, then judge.`
 
@@ -111,8 +112,13 @@ const tools: FunctionDeclaration[] = [
     parameters: { type: SchemaType.OBJECT, properties: {}, required: [] },
   },
   {
+    name: 'check_open_prs',
+    description: 'Check for existing open Autoval PRs on GitHub. Call this BEFORE creating a new PR to avoid duplicates.',
+    parameters: { type: SchemaType.OBJECT, properties: {}, required: [] },
+  },
+  {
     name: 'create_pull_request',
-    description: 'Create a GitHub PR with updated prompt and new safety rule.',
+    description: 'Create a GitHub PR with updated prompt and new safety rule. ALWAYS call check_open_prs first to avoid duplicates.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -212,6 +218,10 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
         prompt_addition: args.prompt_addition as string,
         safety_rule_json: args.safety_rule_json as string,
       })
+      break
+
+    case 'check_open_prs':
+      result = await executeCheckOpenPRs()
       break
 
     case 'scan_recent_logs': {

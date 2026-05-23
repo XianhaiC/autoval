@@ -5,6 +5,32 @@ const OWNER = process.env.GITHUB_OWNER || ''
 const REPO = process.env.GITHUB_REPO || ''
 const BASE_PATH = process.env.GITHUB_BASE_PATH || 'frontend' // subfolder in the repo
 
+export async function executeCheckOpenPRs() {
+  if (!process.env.GITHUB_TOKEN) {
+    return { error: 'GITHUB_TOKEN not configured', open_prs: [] }
+  }
+  try {
+    const { data: allOpen } = await octokit.pulls.list({
+      owner: OWNER, repo: REPO,
+      state: 'open',
+    })
+    const autovalPRs = allOpen.filter((pr) => pr.head.ref.startsWith('autoval/'))
+    return {
+      open_prs: autovalPRs.map((pr) => ({
+        number: pr.number,
+        title: pr.title,
+        url: pr.html_url,
+        branch: pr.head.ref,
+        created_at: pr.created_at,
+      })),
+      count: autovalPRs.length,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Unknown error'
+    return { error: `Failed to check PRs: ${msg}`, open_prs: [] }
+  }
+}
+
 export async function readGitHubFile(path: string): Promise<string | null> {
   try {
     const { data } = await octokit.repos.getContent({ owner: OWNER, repo: REPO, path })

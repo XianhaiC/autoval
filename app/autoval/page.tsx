@@ -24,6 +24,7 @@ const TOOL_LABELS: Record<string, { icon: string; label: string; color: string }
   test_prompt_fix: { icon: '🔧', label: 'Test Prompt Fix', color: '#FFF9DB' },
   read_prompt: { icon: '📄', label: 'Read System Prompt', color: '#F3F0FF' },
   read_evals: { icon: '📋', label: 'Read Safety Rules', color: '#F3F0FF' },
+  check_open_prs: { icon: '🔎', label: 'Check Open PRs', color: '#EDF2FF' },
   create_pull_request: { icon: '🚀', label: 'Create Pull Request', color: '#FFF4E6' },
   scan_recent_logs: { icon: '📊', label: 'Scan Recent Logs', color: '#EDF2FF' },
   complete_run: { icon: '✅', label: 'Complete', color: '#EBFBEE' },
