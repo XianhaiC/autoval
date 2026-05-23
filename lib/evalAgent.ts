@@ -9,22 +9,26 @@ import {
 import { executeQueryClickhouse } from '@/lib/tools/queryClickhouse'
 import { executeNimbleSearch } from '@/lib/tools/nimbleSearch'
 import { executeCreatePR, executeReadPrompt, executeReadEvals } from '@/lib/tools/createPR'
+import { executeTestPromptFix } from '@/lib/tools/runEvals'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 const SYSTEM_PROMPT = `You are Autoval, an AI agent that finds and fixes quality issues in LLM-powered applications.
 
 You have access to a ClickHouse database containing production logs of LLM calls. Each log entry has:
-- id (String), input (String), output (String), model (String), latency_ms (UInt32), timestamp (DateTime64)
+- id (String), input (String), output (String), model (String), latency_ms (UInt32), scored (UInt8, 0=unprocessed, 1=processed), timestamp (DateTime64)
+
+Table name: autoval.llm_call_logs
 
 Your job:
-1. Find log entries with problematic outputs
+1. Scan for unprocessed log entries (scored = 0) with problematic outputs
 2. Research WHY the output is wrong using web search (nimble_web_search)
 3. Judge the output with evidence (judge_output)
-4. Create a safety rule that prevents this from happening again (generate_safety_rule)
-5. Test a prompt fix against all existing safety rules (test_prompt_fix)
-6. Submit a PR with the fix (create_pull_request)
-7. Call complete_run when done
+4. Read the current system prompt from GitHub (read_prompt)
+5. Create a safety rule that prevents this from happening again (generate_safety_rule)
+6. Read existing safety rules (read_evals) and test a prompt fix against them (test_prompt_fix)
+7. Submit a PR with the fix (create_pull_request)
+8. Call complete_run when done
 
 Always ground judgments in web evidence for medical, legal, or factual claims. Search first, then judge.`
 
@@ -188,12 +192,9 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       break
 
     case 'test_prompt_fix':
-      // TODO: actually run evals. For now simulate success.
-      result = {
-        tested: true,
-        prompt_addition: args.prompt_addition,
-        results: { total: 3, passed: 3, failed: 0, regressions: 0 },
-      }
+      result = await executeTestPromptFix({
+        prompt_addition: args.prompt_addition as string,
+      })
       break
 
     case 'read_prompt':
@@ -215,7 +216,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     case 'scan_recent_logs': {
       const minutes = (args.minutes as number) || 60
       result = await executeQueryClickhouse({
-        sql: `SELECT * FROM llm_call_logs WHERE timestamp > now() - INTERVAL ${minutes} MINUTE ORDER BY timestamp DESC LIMIT 20`,
+        sql: `SELECT * FROM llm_call_logs WHERE scored = 0 AND timestamp > now() - INTERVAL ${minutes} MINUTE ORDER BY timestamp DESC LIMIT 20`,
       })
       break
     }
