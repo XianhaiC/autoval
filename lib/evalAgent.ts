@@ -18,6 +18,8 @@ const SYSTEM_PROMPT = `You are Autoval, an AI agent that finds and fixes quality
 You have access to a ClickHouse database containing production logs of LLM calls. Each log entry has:
 - id (String), input (String), output (String), model (String), latency_ms (UInt32), scored (UInt8, 0=unprocessed, 1=processed), timestamp (DateTime64)
 
+IMPORTANT: ClickHouse LIKE is case-sensitive. Always use iLIKE for case-insensitive text searches.
+
 Table name: autoval.llm_call_logs
 
 Your job:
