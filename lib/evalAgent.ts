@@ -11,6 +11,19 @@ import { executeNimbleSearch } from '@/lib/tools/nimbleSearch'
 import { executeCreatePR, executeReadPrompt, executeReadEvals, executeCheckOpenPRs } from '@/lib/tools/createPR'
 import { executeTestPromptFix } from '@/lib/tools/runEvals'
 
+// dd-trace loaded via NODE_OPTIONS at startup — access via globalThis to avoid webpack bundling
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getLlmobs(): any {
+  try {
+    // Use eval to prevent webpack from resolving this
+    // eslint-disable-next-line no-eval
+    const tracer = eval("require('dd-trace')")
+    return tracer?.llmobs || null
+  } catch {
+    return null
+  }
+}
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 const SYSTEM_PROMPT = `You are Autoval, an AI agent that finds and fixes quality issues in LLM-powered applications.
@@ -174,6 +187,11 @@ export interface EvalStep {
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<{ result: unknown; step: EvalStep }> {
   const start = Date.now()
+  // Trace tool execution for DD LLM Observability
+  const _llmobs = getLlmobs()
+  if (_llmobs?.enabled?.()) {
+    _llmobs.annotate({ inputData: JSON.stringify(args).slice(0, 500), tags: { tool: name } })
+  }
   let result: unknown
 
   switch (name) {
@@ -296,6 +314,8 @@ export async function* runEvalAgent(
       break
     }
     const result = await chat.sendMessage(currentParts)
+    // Annotate for DD LLM Observability (non-blocking)
+    try { const _lo = getLlmobs(); if (_lo?.enabled?.()) _lo.annotate({ inputData: JSON.stringify(currentParts).slice(0, 1000) }) } catch {}
     const candidate = result.response.candidates?.[0]
     if (!candidate) break
 
