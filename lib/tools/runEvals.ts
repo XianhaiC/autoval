@@ -25,11 +25,20 @@ interface EvalResult {
   reason: string
 }
 
-export async function executeTestPromptFix(args: { prompt_addition: string }) {
-  // 1. Read current prompt from GitHub
-  const promptResult = await executeReadPrompt()
-  const currentPrompt = 'content' in promptResult ? promptResult.content : ''
-  const newPrompt = currentPrompt + '\n\n' + args.prompt_addition
+export async function executeTestPromptFix(args: { full_prompt?: string; prompt_addition?: string }) {
+  let newPrompt: string
+
+  if (args.full_prompt) {
+    // Use the full prompt directly
+    newPrompt = args.full_prompt
+  } else if (args.prompt_addition) {
+    // Legacy: append to current prompt
+    const promptResult = await executeReadPrompt()
+    const currentPrompt = 'content' in promptResult ? promptResult.content : ''
+    newPrompt = currentPrompt + '\n\n' + args.prompt_addition
+  } else {
+    return { error: 'Either full_prompt or prompt_addition is required' }
+  }
 
   // 2. Read existing eval rules from GitHub
   const evalsResult = await executeReadEvals()

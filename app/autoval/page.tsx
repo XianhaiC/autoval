@@ -30,9 +30,36 @@ const TOOL_LABELS: Record<string, { icon: string; label: string; color: string }
   complete_run: { icon: '✅', label: 'Complete', color: '#EBFBEE' },
 }
 
+// Tools that get grouped into "Eval Pipeline" section
+const EVAL_PIPELINE_TOOLS = new Set([
+  'generate_safety_rule', 'read_prompt', 'read_evals', 'test_prompt_fix',
+])
+
+function TestResultsSummary({ result }: { result: Record<string, unknown> }) {
+  const results = result?.results as { total?: number; passed?: number; failed?: number; details?: { name: string; passed: boolean; reason: string }[] } | undefined
+  if (!results || !results.details) return null
+
+  return (
+    <div className="space-y-1">
+      {results.details.map((d, i) => (
+        <div key={i} className="flex items-center gap-2 text-[12px]">
+          <span className={d.passed ? 'text-[#2B8A3E]' : 'text-[#C92A2A]'}>{d.passed ? 'PASS' : 'FAIL'}</span>
+          <span className="text-[#333]">{d.name}</span>
+          {!d.passed && <span className="text-[#999]">— {d.reason}</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function StepCard({ step }: { step: EvalStep }) {
   const info = TOOL_LABELS[step.tool_name] || { icon: '⚙️', label: step.tool_name, color: '#f2f2f2' }
   const [expanded, setExpanded] = useState(false)
+
+  // Special rendering for test_prompt_fix — show pass/fail inline
+  const isTestResult = step.tool_name === 'test_prompt_fix'
+  const testResults = step.tool_result as { results?: { total?: number; passed?: number; failed?: number } } | undefined
+  const hasResults = isTestResult && testResults?.results && (testResults.results.total ?? 0) > 0
 
   return (
     <div
@@ -42,14 +69,67 @@ function StepCard({ step }: { step: EvalStep }) {
       <div className="flex items-center gap-3 px-3 py-2" style={{ background: info.color }}>
         <span className="text-[14px]">{info.icon}</span>
         <span className="text-[13px] font-semibold text-[#333] flex-1">{info.label}</span>
+        {hasResults && (
+          <span className={`text-[11px] font-bold ${testResults.results!.failed === 0 ? 'text-[#2B8A3E]' : 'text-[#C92A2A]'}`}>
+            {testResults.results!.passed}/{testResults.results!.total} passed
+          </span>
+        )}
         <span className="text-[11px] text-[#999]">{step.duration_ms}ms</span>
       </div>
+      {/* Show test results summary inline for test_prompt_fix */}
+      {hasResults && !expanded && (
+        <div className="px-3 py-2 bg-[#fafafa]">
+          <TestResultsSummary result={step.tool_result as Record<string, unknown>} />
+        </div>
+      )}
       {expanded && (
         <div className="px-3 py-2 bg-[#fafafa] text-[12px] font-mono text-[#666] max-h-[200px] overflow-auto">
           <div className="mb-1 text-[11px] text-[#999] uppercase font-sans font-semibold">Args</div>
           <pre className="whitespace-pre-wrap break-all">{JSON.stringify(step.tool_args, null, 2)}</pre>
           <div className="mt-2 mb-1 text-[11px] text-[#999] uppercase font-sans font-semibold">Result</div>
           <pre className="whitespace-pre-wrap break-all">{JSON.stringify(step.tool_result, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EvalPipelineGroup({ steps }: { steps: EvalStep[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const testStep = steps.find((s) => s.tool_name === 'test_prompt_fix')
+  const testResults = testStep?.tool_result as { results?: { total?: number; passed?: number; failed?: number } } | undefined
+  const totalTime = steps.reduce((t, s) => t + s.duration_ms, 0)
+
+  return (
+    <div className="rounded-[8px] border border-[#e8e8e8] overflow-hidden">
+      <div
+        className="flex items-center gap-3 px-3 py-2 cursor-pointer"
+        style={{ background: '#FFF9DB' }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="text-[14px]">🧪</span>
+        <span className="text-[13px] font-semibold text-[#333] flex-1">
+          Eval Pipeline
+          <span className="text-[11px] font-normal text-[#999] ml-2">({steps.length} steps)</span>
+        </span>
+        {testResults?.results && (
+          <span className={`text-[11px] font-bold ${testResults.results.failed === 0 ? 'text-[#2B8A3E]' : 'text-[#C92A2A]'}`}>
+            {testResults.results.passed}/{testResults.results.total} passed
+          </span>
+        )}
+        <span className="text-[11px] text-[#999]">{totalTime}ms</span>
+      </div>
+      {/* Always show test results summary */}
+      {testStep && (
+        <div className="px-3 py-2 bg-[#fafafa] border-t border-[#e8e8e8]">
+          <TestResultsSummary result={testStep.tool_result as Record<string, unknown>} />
+        </div>
+      )}
+      {expanded && (
+        <div className="px-3 py-2 space-y-2 bg-[#fafafa] border-t border-[#e8e8e8]">
+          {steps.map((step, i) => (
+            <StepCard key={i} step={step} />
+          ))}
         </div>
       )}
     </div>
@@ -252,10 +332,33 @@ export default function AutovalPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {/* Tool call steps */}
-                {msg.steps?.map((step, j) => (
-                  <StepCard key={j} step={step} />
-                ))}
+                {/* Tool call steps — group eval pipeline tools */}
+                {(() => {
+                  if (!msg.steps) return null
+                  const groups: (EvalStep | EvalStep[])[] = []
+                  let evalBatch: EvalStep[] = []
+
+                  for (const step of msg.steps) {
+                    if (EVAL_PIPELINE_TOOLS.has(step.tool_name)) {
+                      evalBatch.push(step)
+                    } else {
+                      if (evalBatch.length > 0) {
+                        groups.push(evalBatch)
+                        evalBatch = []
+                      }
+                      groups.push(step)
+                    }
+                  }
+                  if (evalBatch.length > 0) groups.push(evalBatch)
+
+                  return groups.map((item, j) =>
+                    Array.isArray(item) ? (
+                      <EvalPipelineGroup key={`grp-${j}`} steps={item} />
+                    ) : (
+                      <StepCard key={j} step={item} />
+                    )
+                  )
+                })()}
                 {/* Text response */}
                 {msg.content && (
                   <div className="bg-white border border-[#e8e8e8] px-4 py-3 rounded-[12px] rounded-bl-[4px] max-w-[80%] text-[14px] text-[#333] leading-relaxed">

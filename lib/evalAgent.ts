@@ -26,8 +26,9 @@ Your job:
 3. Judge the output with evidence (judge_output)
 4. Read the current system prompt from GitHub (read_prompt)
 5. Create a safety rule that prevents this from happening again (generate_safety_rule)
-6. Read existing safety rules (read_evals) and test a prompt fix against ALL of them (test_prompt_fix)
-7. CRITICAL: Check test_prompt_fix results. If ANY existing evals FAIL (regressions), do NOT create a PR. Instead, iterate on the prompt fix and re-test until all evals pass with 0 regressions.
+6. Read the current prompt (read_prompt), then modify it to fix the issue. Pass the COMPLETE updated prompt to test_prompt_fix as full_prompt. You can change any section of the prompt, not just append.
+7. Read existing safety rules (read_evals) — test_prompt_fix runs all of them automatically against your new prompt.
+8. CRITICAL: Check test_prompt_fix results. If ANY existing evals FAIL (regressions), iterate on the prompt and re-test until all evals pass with 0 regressions.
 8. Before creating a PR, call check_open_prs to see if there are already open Autoval PRs. If a similar fix already exists, skip PR creation and note it in the summary.
 9. Only submit a PR (create_pull_request) when test_prompt_fix shows ALL evals passing AND no duplicate PR exists.
 10. Call complete_run when done
@@ -96,9 +97,9 @@ const tools: FunctionDeclaration[] = [
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        prompt_addition: { type: SchemaType.STRING, description: 'Text to add to the system prompt' },
+        full_prompt: { type: SchemaType.STRING, description: 'The complete updated system prompt. Read the current prompt first with read_prompt, then modify it and pass the full result here.' },
       },
-      required: ['prompt_addition'],
+      required: ['full_prompt'],
     },
   },
   {
@@ -123,10 +124,10 @@ const tools: FunctionDeclaration[] = [
       type: SchemaType.OBJECT,
       properties: {
         title: { type: SchemaType.STRING },
-        prompt_addition: { type: SchemaType.STRING },
+        full_prompt: { type: SchemaType.STRING, description: 'The complete updated system prompt to commit' },
         safety_rule_json: { type: SchemaType.STRING },
       },
-      required: ['title', 'prompt_addition', 'safety_rule_json'],
+      required: ['title', 'full_prompt', 'safety_rule_json'],
     },
   },
   {
@@ -200,7 +201,8 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 
     case 'test_prompt_fix':
       result = await executeTestPromptFix({
-        prompt_addition: args.prompt_addition as string,
+        full_prompt: args.full_prompt as string,
+        prompt_addition: args.prompt_addition as string | undefined,
       })
       break
 
@@ -215,7 +217,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     case 'create_pull_request':
       result = await executeCreatePR({
         title: args.title as string,
-        prompt_addition: args.prompt_addition as string,
+        full_prompt: args.full_prompt as string,
         safety_rule_json: args.safety_rule_json as string,
       })
       break

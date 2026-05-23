@@ -82,7 +82,8 @@ export async function executeReadEvals() {
 
 export async function executeCreatePR(args: {
   title: string
-  prompt_addition: string
+  full_prompt?: string
+  prompt_addition?: string
   safety_rule_json: string
 }) {
   if (!process.env.GITHUB_TOKEN) {
@@ -102,9 +103,14 @@ export async function executeCreatePR(args: {
       sha: baseSha,
     })
 
-    // 3. Read current prompt
-    const currentPrompt = await readGitHubFile(`${BASE_PATH}/prompts/system-prompt.txt`)
-    const updatedPrompt = (currentPrompt || '') + '\n\n' + args.prompt_addition
+    // 3. Build updated prompt
+    let updatedPrompt: string
+    if (args.full_prompt) {
+      updatedPrompt = args.full_prompt
+    } else {
+      const currentPrompt = await readGitHubFile(`${BASE_PATH}/prompts/system-prompt.txt`)
+      updatedPrompt = (currentPrompt || '') + '\n\n' + (args.prompt_addition || '')
+    }
 
     // 4. Commit updated prompt
     await createOrUpdateFile(
