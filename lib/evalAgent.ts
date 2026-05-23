@@ -187,8 +187,7 @@ export interface EvalStep {
 
 async function executeTool(name: string, args: Record<string, unknown>): Promise<{ result: unknown; step: EvalStep }> {
   const start = Date.now()
-  // Trace tool execution for DD LLM Observability
-  try { getLlmobs()?.annotate?.({ inputData: JSON.stringify(args).slice(0, 500), tags: { tool: name } }) } catch {}
+  // DD LLM Observability — tool span will be created by the caller
   let result: unknown
 
   switch (name) {
@@ -310,9 +309,20 @@ export async function* runEvalAgent(
       yield { type: 'text' as const, content: `Agent stopped: reached max ${MAX_ITERATIONS} iterations.` }
       break
     }
+    // Wrap Gemini call with DD LLM Observability
+    const _lo = getLlmobs()
     const result = await chat.sendMessage(currentParts)
-    // Annotate for DD LLM Observability (non-blocking)
-    try { getLlmobs()?.annotate?.({ inputData: JSON.stringify(currentParts).slice(0, 1000) }) } catch {}
+    try {
+      if (_lo) {
+        const inputStr = currentParts.map((p: Part) => ((p as unknown as Record<string, string>).text) || '[fn]').join('\n').slice(0, 2000)
+        const parts = result.response.candidates?.[0]?.content?.parts || []
+        const outputStr = parts.map((p: Part) => ((p as unknown as Record<string, string>).text) || p.functionCall?.name || '').filter(Boolean).join('\n').slice(0, 2000)
+        _lo.trace(
+          { kind: 'llm', name: `gemini-turn-${iterations}`, modelName: 'gemini-2.5-flash', modelProvider: 'google' },
+          () => { _lo.annotate({ inputData: inputStr, outputData: outputStr }) }
+        )
+      }
+    } catch {}
     const candidate = result.response.candidates?.[0]
     if (!candidate) break
 
