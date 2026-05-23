@@ -299,7 +299,7 @@ export default function AutovalPage() {
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 max-w-[700px] mx-auto w-full">
         {messages.length === 0 && (
           <div className="text-center py-20">
-            <img src="/autovalai.png" alt="Autoval" className="h-[40px] mx-auto mb-2" />
+            <img src="/autovalai.png" alt="Autoval" className="h-[80px] mx-auto mb-4" />
             <p className="text-[14px] text-[#999]">
               Ask me to check a log entry, scan for issues, or investigate a problem.
             </p>
