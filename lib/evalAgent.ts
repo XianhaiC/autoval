@@ -311,7 +311,18 @@ export async function* runEvalAgent(
     }
     // Wrap Gemini call with DD LLM Observability
     const _lo = getLlmobs()
-    const result = await chat.sendMessage(currentParts)
+    let result
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        result = await chat.sendMessage(currentParts)
+        break
+      } catch (e) {
+        if (attempt === 2) throw e
+        console.error(`[evalAgent] Gemini attempt ${attempt + 1} failed, retrying...`, (e as Error).message)
+        await new Promise((r) => setTimeout(r, 2000))
+      }
+    }
+    if (!result) break
     try {
       if (_lo) {
         const inputStr = currentParts.map((p: Part) => ((p as unknown as Record<string, string>).text) || '[fn]').join('\n').slice(0, 2000)

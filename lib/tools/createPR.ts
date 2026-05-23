@@ -121,8 +121,19 @@ export async function executeCreatePR(args: {
     )
 
     // 5. Commit new eval file
-    const rule = JSON.parse(args.safety_rule_json)
-    const evalFileName = (rule.name || 'rule').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    let rule: Record<string, unknown>
+    try {
+      rule = JSON.parse(args.safety_rule_json)
+    } catch {
+      // Gemini sometimes produces invalid JSON escapes — try to clean it
+      const cleaned = args.safety_rule_json.replace(/[\x00-\x1F]/g, ' ')
+      try {
+        rule = JSON.parse(cleaned)
+      } catch {
+        rule = { name: 'safety-rule', raw: args.safety_rule_json }
+      }
+    }
+    const evalFileName = (rule.name as string || 'rule').toLowerCase().replace(/[^a-z0-9]+/g, '-')
     await createOrUpdateFile(
       `${BASE_PATH}/evals/${evalFileName}.json`,
       JSON.stringify(rule, null, 2),
