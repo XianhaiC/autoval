@@ -22,8 +22,10 @@ IMPORTANT: ClickHouse LIKE is case-sensitive. Always use iLIKE for case-insensit
 
 Table name: autoval.llm_call_logs
 
+When the user asks you to scan or investigate, start by using scan_recent_logs or query_clickhouse with "SELECT * FROM autoval.llm_call_logs WHERE scored = 0 ORDER BY timestamp DESC LIMIT 20" to find ALL unprocessed entries. Do NOT add text filters unless the user specifically asks to search for something.
+
 Your job:
-1. Scan for unprocessed log entries (scored = 0) with problematic outputs
+1. Scan for unprocessed log entries (scored = 0) — fetch them ALL first, then review each output for quality issues
 2. Research WHY the output is wrong using web search (nimble_web_search)
 3. Judge the output with evidence (judge_output)
 4. Read the current system prompt from GitHub (read_prompt)
