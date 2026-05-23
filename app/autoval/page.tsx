@@ -318,6 +318,15 @@ export default function AutovalPage() {
                 </button>
               ))}
             </div>
+            <div className="mt-16">
+              <p className="text-[11px] uppercase tracking-[0.1em] text-[#ccc] mb-4">Powered by</p>
+              <div className="flex items-center justify-center gap-8">
+                <img src="/clickhouse.png" alt="ClickHouse" className="h-[24px] opacity-40 hover:opacity-70 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <img src="/datadog.png" alt="Datadog" className="h-[24px] opacity-40 hover:opacity-70 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <img src="/nimble.png" alt="Nimble" className="h-[24px] opacity-40 hover:opacity-70 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <img src="/gemini.png" alt="Gemini" className="h-[24px] opacity-40 hover:opacity-70 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              </div>
+            </div>
           </div>
         )}
 
