@@ -24,7 +24,7 @@ function StatusBadge({ status }: { status: string }) {
     error: 'bg-[#FFF5F5] text-[#C92A2A]',
   }
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${styles[status] || 'bg-[#f2f2f2] text-[#666]'}`}>
+    <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold uppercase ${styles[status] || 'bg-[#f2f2f2] text-[#666]'}`}>
       {status}
     </span>
   )
@@ -70,7 +70,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="bg-white border-b border-[#e8e8e8] px-6 py-4 flex items-center gap-3">
         <img src="/autovalai.png" alt="Autoval" className="h-[28px]" />
-        <span className="text-[12px] text-[#bbb]">dashboard</span>
+        <span className="text-[12px] text-[#bbb] uppercase tracking-[0.05em]">Dashboard</span>
         <div className="flex-1" />
         <Link href="/safety-rules" className="text-[13px] text-[#666] hover:text-[#111]">
           Safety Rules

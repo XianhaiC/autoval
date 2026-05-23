@@ -281,7 +281,7 @@ export default function AutovalPage() {
       {/* Header */}
       <div className="bg-white border-b border-[#e8e8e8] px-6 py-4 flex items-center gap-3">
         <img src="/autovalai.png" alt="Autoval" className="h-[28px]" />
-        <span className="text-[12px] text-[#bbb]">eval agent</span>
+        <span className="text-[12px] text-[#bbb] uppercase tracking-[0.05em]">Eval Agent</span>
         <div className="flex-1" />
         {scanStatus && (
           <span className="text-[11px] text-[#999] mr-2">{scanStatus}</span>
