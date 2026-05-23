@@ -372,6 +372,17 @@ export default function AutovalPage() {
                   )
                 })()}
                 {/* Text response */}
+                {/* PR link from create_pull_request step */}
+                {msg.steps?.some((s) => s.tool_name === 'create_pull_request') && (() => {
+                  const prStep = msg.steps!.find((s) => s.tool_name === 'create_pull_request')
+                  const prUrl = (prStep?.tool_result as Record<string, unknown>)?.pr_url as string | undefined
+                  return prUrl ? (
+                    <a href={prUrl} target="_blank" rel="noopener" className="flex items-center gap-2 px-4 py-3 bg-[#EBFBEE] border border-[#2B8A3E] rounded-[8px] text-[14px] text-[#2B8A3E] font-semibold hover:bg-[#d3f9d8] transition-colors">
+                      🚀 Pull Request Created → {prUrl.split('/').pop()}
+                    </a>
+                  ) : null
+                })()}
+                {/* Text response */}
                 {msg.content && (
                   <div className="bg-white border border-[#e8e8e8] px-4 py-3 rounded-[12px] rounded-bl-[4px] max-w-[80%] text-[14px] text-[#333] leading-relaxed">
                     {msg.content}
