@@ -119,8 +119,7 @@ export default function RunDetailPage() {
     <div className="min-h-screen bg-[#fafafa]">
       {/* Header */}
       <div className="bg-white border-b border-[#e8e8e8] px-6 py-4 flex items-center gap-3">
-        <div className="w-[10px] h-[10px] rounded-full bg-[#2B8A3E]" />
-        <h1 className="text-[18px] font-bold">Autoval</h1>
+        <img src="/autovalai.png" alt="Autoval" className="h-[28px]" />
         <span className="text-[12px] text-[#bbb]">run detail</span>
         <div className="flex-1" />
         <Link href="/dashboard" className="text-[13px] text-[#666] hover:text-[#111]">

@@ -326,7 +326,8 @@ export async function* runEvalAgent(
     const candidate = result.response.candidates?.[0]
     if (!candidate) break
 
-    const responseParts = candidate.content.parts
+    const responseParts = candidate.content?.parts
+    if (!responseParts || responseParts.length === 0) break
     const functionCalls = responseParts.filter((p) => p.functionCall)
 
     // No tool calls — model returned text

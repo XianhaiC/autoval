@@ -276,8 +276,7 @@ export default function AutovalPage() {
     <div className="min-h-screen bg-[#fafafa] flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-[#e8e8e8] px-6 py-4 flex items-center gap-3">
-        <div className="w-[10px] h-[10px] rounded-full bg-[#2B8A3E]" />
-        <h1 className="text-[18px] font-bold">Autoval</h1>
+        <img src="/autovalai.png" alt="Autoval" className="h-[28px]" />
         <span className="text-[12px] text-[#bbb]">eval agent</span>
         <div className="flex-1" />
         {scanStatus && (
@@ -300,7 +299,7 @@ export default function AutovalPage() {
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 max-w-[700px] mx-auto w-full">
         {messages.length === 0 && (
           <div className="text-center py-20">
-            <div className="text-[32px] font-black tracking-tight mb-2">Autoval</div>
+            <img src="/autovalai.png" alt="Autoval" className="h-[40px] mx-auto mb-2" />
             <p className="text-[14px] text-[#999]">
               Ask me to check a log entry, scan for issues, or investigate a problem.
             </p>
