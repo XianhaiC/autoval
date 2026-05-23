@@ -156,6 +156,8 @@ export default function AutovalPage() {
         <div className="w-[10px] h-[10px] rounded-full bg-[#2B8A3E]" />
         <h1 className="text-[18px] font-bold">Autoval</h1>
         <span className="text-[12px] text-[#bbb]">eval agent</span>
+        <div className="flex-1" />
+        <a href="/dashboard" className="text-[13px] text-[#666] hover:text-[#111]">Dashboard</a>
       </div>
 
       {/* Messages */}
