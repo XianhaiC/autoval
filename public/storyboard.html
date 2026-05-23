@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoval — Demo Storyboard v2</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #fafafa; color: #1a1a1a; }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(253,252,249,0.9); backdrop-filter: blur(12px); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+.nav-title { font-size: 13px; font-weight: 800; color: #1a1a1a; letter-spacing: 0.12em; text-transform: uppercase; }
+.nav-controls { display: flex; gap: 8px; align-items: center; }
+.nav-btn { background: transparent; border: 1px solid #ddd; color: #999; padding: 6px 16px; border-radius: 100px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s; }
+.nav-btn:hover { border-color: #1a1a1a; color: #1a1a1a; }
+.nav-step { color: #ccc; font-size: 12px; font-variant-numeric: tabular-nums; }
+.slide { display: none; min-height: 100vh; padding: 100px 32px 60px; max-width: 880px; margin: 0 auto; }
+.slide.active { display: block; }
+.slide-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: #111111; margin-bottom: 12px; font-weight: 600; }
+.slide-title { font-size: 36px; font-weight: 900; color: #1a1a1a; margin-bottom: 16px; letter-spacing: -0.02em; line-height: 1.1; }
+.slide-subtitle { font-size: 16px; color: #999; margin-bottom: 40px; line-height: 1.7; font-weight: 400; }
+.keyboard-hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(253,252,249,0.9); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 100px; font-size: 12px; color: #bbb; z-index: 100; border: 1px solid #eee; }
+kbd { background: #e8e8e8; padding: 2px 8px; border-radius: 4px; font-size: 11px; color: #999; border: none; }
+
+/* Slack */
+.slack { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04); }
+.slack-hdr { padding: 14px 20px; border-bottom: 1px solid #e8e8e8; font-weight: 700; font-size: 15px; color: #1a1a1a; }
+.slack-hdr::before { content: "# "; color: #111111; }
+.slack-body { padding: 20px; }
+.msg { display: flex; gap: 12px; padding: 10px 0; }
+.av { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; }
+.msg-content { flex: 1; }
+.msg-name { font-weight: 700; font-size: 14px; color: #1a1a1a; }
+.msg-name .time { font-weight: 400; color: #bbb; font-size: 12px; margin-left: 8px; }
+.msg-name .badge { background: #e8e8e8; color: #999; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 600; }
+.msg-text { color: #444; font-size: 14px; line-height: 1.7; margin-top: 6px; }
+.msg-text code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #111111; font-weight: 600; }
+.msg-text .mention { background: #EBF0FF; color: #3B5BDB; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.thread { margin: 16px 0 0 48px; padding: 16px; background: #fafafa; border-radius: 10px; border-left: 3px solid #111111; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+
+/* Log Table */
+.logs { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04); }
+.logs-hdr { padding: 14px 20px; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; }
+.logs-hdr .logo { color: #632ca6; font-weight: 800; font-size: 14px; }
+.logs-hdr .title { font-size: 12px; color: #bbb; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; padding: 10px 16px; color: #bbb; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; border-bottom: 1px solid #e8e8e8; }
+td { padding: 10px 16px; border-bottom: 1px solid #f2f2f2; color: #555; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+tr.bad td { background: #FFFBF0; }
+tr.bad td:first-child { border-left: 3px solid #111111; }
+
+/* Agent Trace */
+.trace { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04); }
+.trace-hdr { padding: 14px 20px; border-bottom: 1px solid #e8e8e8; font-weight: 700; font-size: 14px; color: #1a1a1a; display: flex; align-items: center; gap: 10px; }
+.trace-hdr .dot { width: 8px; height: 8px; border-radius: 50%; background: #111111; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+.trace-step { padding: 16px 20px; border-bottom: 1px solid #f2f2f2; display: flex; gap: 14px; }
+.trace-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.trace-icon.search { background: #EDF2FF; color: #3B5BDB; }
+.trace-icon.judge { background: #F3F0FF; color: #7048E8; }
+.trace-icon.eval { background: #EBFBEE; color: #2B8A3E; }
+.trace-icon.fix { background: #FFF9DB; color: #E67700; }
+.trace-icon.pr { background: #FFF4E6; color: #D9480F; }
+.trace-body { flex: 1; }
+.trace-title { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+.trace-detail { font-size: 13px; color: #999; margin-top: 4px; line-height: 1.6; }
+.trace-detail code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; color: #111111; font-size: 11px; }
+.trace-time { font-size: 11px; color: #ccc; white-space: nowrap; font-weight: 500; }
+.trace-tool { background: #fafafa; border-radius: 8px; padding: 10px 14px; margin-top: 8px; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; color: #888; border: 1px solid #e8e8e8; }
+.trace-result { margin-top: 8px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; }
+.trace-result.pass { background: #EBFBEE; color: #2B8A3E; }
+.trace-result.fail { background: #FFF5F5; color: #C92A2A; }
+
+/* Braintrust */
+.bt { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04); color: #1a1a1a; }
+.bt-hdr { padding: 14px 20px; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; gap: 12px; }
+.bt-logo { font-weight: 800; font-size: 14px; color: #5046e5; }
+.bt-crumb { font-size: 12px; color: #bbb; }
+.bt-body { padding: 20px; }
+.score-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #f2f2f2; }
+.score-name { font-size: 13px; font-weight: 600; color: #888; width: 150px; }
+.score-val { font-size: 15px; font-weight: 800; }
+.score-val.g { color: #2B8A3E; }
+.score-val.b { color: #C92A2A; }
+.score-change { font-size: 12px; color: #2B8A3E; font-weight: 600; }
+
+/* GitHub PR — standard GitHub theme */
+.gh { background: #0d1117; border-radius: 10px; overflow: hidden; border: 1px solid #30363d; color: #e6edf3; }
+.gh-hdr { background: #161b22; padding: 20px 24px; border-bottom: 1px solid #30363d; }
+.gh-title { font-size: 20px; font-weight: 600; color: #e6edf3; }
+.gh-title span { color: #7d8590; }
+.gh-badge { display: inline-block; background: #238636; color: #fff; font-size: 12px; font-weight: 600; padding: 4px 14px; border-radius: 100px; margin-top: 8px; }
+.gh-meta { font-size: 13px; color: #7d8590; margin-top: 8px; }
+.gh-body { padding: 24px; }
+.diff { background: #161b22; border-radius: 6px; overflow: hidden; border: 1px solid #30363d; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; margin-top: 16px; }
+.diff-hdr { background: #1c2128; padding: 10px 16px; color: #7d8590; border-bottom: 1px solid #30363d; font-weight: 500; }
+.diff-line { padding: 3px 16px; }
+.diff-line.add { background: #1a2f23; color: #3fb950; }
+.diff-line.del { background: #3d1f20; color: #f85149; }
+.diff-line.ctx { color: #7d8590; }
+
+/* Dashboard */
+.dash { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04); color: #1a1a1a; }
+.dash-hdr { padding: 16px 24px; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; }
+.dash-logo { font-weight: 900; font-size: 18px; color: #1a1a1a; letter-spacing: -0.02em; }
+.dash-logo em { color: #111111; font-style: normal; }
+.dash-tabs { display: flex; gap: 0; }
+.dash-tab { padding: 8px 16px; font-size: 13px; color: #ccc; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
+.dash-tab.active { color: #1a1a1a; border-bottom-color: #111111; font-weight: 600; }
+.dash-body { padding: 24px; }
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.stat-card { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 10px; padding: 20px; }
+.stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #bbb; margin-bottom: 6px; font-weight: 600; }
+.stat-num { font-size: 32px; font-weight: 900; letter-spacing: -0.02em; }
+.stat-sub { font-size: 12px; color: #bbb; margin-top: 4px; }
+.stat-sub.up { color: #2B8A3E; }
+.chart { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 10px; padding: 20px; margin-bottom: 12px; }
+.chart-title { font-size: 11px; font-weight: 600; color: #bbb; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.1em; }
+.chart-bars { display: flex; align-items: flex-end; gap: 5px; height: 100px; }
+.chart-bar { flex: 1; border-radius: 4px 4px 0 0; min-width: 0; position: relative; }
+.chart-bar .tip { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #bbb; white-space: nowrap; }
+.chart-labels { display: flex; gap: 5px; margin-top: 6px; }
+.chart-labels span { flex: 1; text-align: center; font-size: 9px; color: #ccc; }
+
+/* Code */
+.code-block { background: #f6f8fa; border-radius: 12px; padding: 24px; overflow-x: auto; border: 1px solid #e8e8e8; }
+.code-block pre { font-family: "SF Mono", Menlo, monospace; font-size: 13px; line-height: 1.8; color: #24292f; }
+.code-block .comment { color: #999; }
+.code-block .keyword { color: #cf222e; }
+.code-block .string { color: #0a3069; }
+.code-block .fn { color: #8250df; }
+.code-block .highlight { background: #fff8c5; display: inline; padding: 2px 6px; border-radius: 4px; border-left: 2px solid #111; }
+
+/* Use Cases */
+.use-cases { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.use-case { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04); transition: transform 0.15s; }
+.use-case:hover { transform: translateY(-2px); }
+.use-case-icon { font-size: 28px; margin-bottom: 12px; }
+.use-case-company { font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+.use-case-desc { font-size: 13px; color: #999; line-height: 1.6; margin-bottom: 14px; }
+.use-case-bug { background: #FFF5F5; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #C92A2A; font-family: 'SF Mono', Menlo, monospace; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-title">Autoval Storyboard v2</div>
+  <div class="nav-controls">
+    <button class="nav-btn" onclick="prev()">← Prev</button>
+    <span class="nav-step" id="step-indicator">1 / 15</span>
+    <button class="nav-btn" onclick="next()">Next →</button>
+  </div>
+</div>
+
+<!-- SLIDE 1: The App -->
+<div class="slide active" id="slide-1">
+  <div class="slide-title">Your AI App Gives Bad Advice</div>
+  <div class="slide-subtitle">A medical advice chatbot. A user asks a simple question. The answer could hurt someone.</div>
+  <div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04);overflow:hidden;max-width:480px">
+    <div style="padding:14px 20px;border-bottom:1px solid #e8e8e8;font-weight:700;font-size:15px">🏥 MedAssist</div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="align-self:flex-start;background:#f2f2f2;padding:10px 16px;border-radius:12px 12px 12px 4px;font-size:14px;color:#333;max-width:80%">I'm taking warfarin for my heart condition. I have a bad headache. What can I take?</div>
+      <div style="align-self:flex-end;background:#111;color:#fff;padding:10px 16px;border-radius:12px 12px 4px 12px;font-size:14px;max-width:80%">For a headache, I'd recommend <strong>aspirin</strong>. Take 500mg with water. It's effective and widely available over the counter.</div>
+      <div style="background:#FFF5F5;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:12px;color:#C92A2A">⚠ <strong>Dangerous:</strong> Aspirin + warfarin dramatically increases bleeding risk. Should recommend acetaminophen (Tylenol) instead.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 2: The Logs -->
+<div class="slide" id="slide-2">
+  <div class="slide-title">The Data Exists. Nobody Acts On It.</div>
+  <div class="slide-subtitle">Every LLM call is logged to ClickHouse. The bad outputs are right there. But nobody has time to write evals for each one.</div>
+  <div class="logs">
+    <div class="logs-hdr">
+      <span class="logo">⚡ ClickHouse</span>
+      <span class="title">llm_call_logs · medical-advisor · last 24h · 312 calls</span>
+    </div>
+    <table>
+      <tr><th>ID</th><th>Time</th><th>Input (last msg)</th><th>Output</th><th>Model</th><th>Status</th></tr>
+      <tr><td>evt_4401</td><td>9:12 AM</td><td>"What helps with allergies?"</td><td>Try cetirizine (Zyrtec)...</td><td>gemini-2.5-flash</td><td style="color:#4a9">✓</td></tr>
+      <tr><td>evt_4402</td><td>9:15 AM</td><td>"Is 101°F fever serious?"</td><td>A low-grade fever is normal...</td><td>gemini-2.5-flash</td><td style="color:#4a9">✓</td></tr>
+      <tr class="bad"><td>evt_4403</td><td>9:18 AM</td><td>"I'm on warfarin, headache?"</td><td style="color:#C92A2A">Take aspirin 500mg...</td><td>gemini-2.5-flash</td><td style="color:#C92A2A">⚠</td></tr>
+      <tr><td>evt_4404</td><td>9:22 AM</td><td>"How much water per day?"</td><td>About 8 glasses (64 oz)...</td><td>gemini-2.5-flash</td><td style="color:#4a9">✓</td></tr>
+      <tr class="bad"><td>evt_4405</td><td>9:31 AM</td><td>"Pregnant, what for pain?"</td><td style="color:#C92A2A">Ibuprofen works well...</td><td>gemini-2.5-flash</td><td style="color:#C92A2A">⚠</td></tr>
+      <tr class="bad"><td>evt_4406</td><td>9:40 AM</td><td>"Kid fever 101, Tylenol dose?"</td><td style="color:#C92A2A">Take 500mg every 6 hrs...</td><td>gemini-2.5-flash</td><td style="color:#C92A2A">⚠</td></tr>
+      <tr><td>evt_4407</td><td>9:45 AM</td><td>"Best vitamins for energy?"</td><td>B12 and iron are helpful...</td><td>gemini-2.5-flash</td><td style="color:#4a9">✓</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- SLIDE 3: Trigger -->
+<div class="slide" id="slide-3">
+  <div class="slide-title">Just Ask.</div>
+  <div class="slide-subtitle">Open the Autoval panel. Talk to it like you'd talk to a colleague.</div>
+  <div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04);overflow:hidden;max-width:520px">
+    <div style="padding:14px 20px;border-bottom:1px solid #e8e8e8;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px">
+      <div style="width:8px;height:8px;border-radius:50%;background:#2B8A3E"></div>
+      Autoval
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="align-self:flex-start;background:#f2f2f2;padding:10px 16px;border-radius:12px 12px 12px 4px;font-size:14px;color:#333;max-width:85%">The last response recommended aspirin to someone on warfarin. Can you look into that?</div>
+      <div style="align-self:flex-end;background:#111;color:#fff;padding:10px 16px;border-radius:12px 12px 4px 12px;font-size:14px;max-width:85%">🔍 Looking into it. Querying logs and checking for drug interactions...</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 4: Agent Trace -->
+<div class="slide" id="slide-4">
+  <div class="slide-title">Watch the Agent Think</div>
+  <div class="slide-subtitle">Full chain of thought. Every tool call. Every decision. Transparent and auditable.</div>
+  <div class="trace">
+    <div class="trace-hdr"><div class="dot"></div> Agent Run — evt_4403 · 52s total</div>
+    <div class="trace-step">
+      <div class="trace-icon search">🔍</div>
+      <div class="trace-body">
+        <div class="trace-title">Query ClickHouse</div>
+        <div class="trace-tool">→ SELECT * FROM llm_call_logs WHERE id = 'evt_4403'</div>
+        <div class="trace-detail" style="margin-top:8px">
+          <strong>Input:</strong> "I'm on warfarin, I have a headache, what can I take?"<br>
+          <strong>Output:</strong> "Take aspirin 500mg..." · gemini-2.5-flash
+        </div>
+      </div>
+      <div class="trace-time">0.1s</div>
+    </div>
+    <div class="trace-step">
+      <div class="trace-icon" style="background:#FFF4E6;color:#D9480F">🌐</div>
+      <div class="trace-body">
+        <div class="trace-title">Nimble Web Search — Ground Truth</div>
+        <div class="trace-tool">→ nimble.webSearch("aspirin warfarin drug interaction")</div>
+        <div class="trace-detail" style="margin-top:8px">
+          <strong>drugs.com:</strong> "Major interaction. Increased risk of bleeding."<br>
+          <strong>Mayo Clinic:</strong> "Avoid aspirin with anticoagulants."
+        </div>
+      </div>
+      <div class="trace-time">1.2s</div>
+    </div>
+    <div class="trace-step">
+      <div class="trace-icon judge">⚖️</div>
+      <div class="trace-body">
+        <div class="trace-title">LLM-as-Judge (Gemini + Web Evidence)</div>
+        <div class="trace-tool">→ gemini-2.5-flash: "Judge this output against the web evidence"</div>
+        <div class="trace-result fail">❌ DANGEROUS — drugs.com confirms aspirin + warfarin = major bleeding risk. Should recommend acetaminophen.</div>
+      </div>
+      <div class="trace-time">2.8s</div>
+    </div>
+    <div class="trace-step">
+      <div class="trace-icon eval">📝</div>
+      <div class="trace-body">
+        <div class="trace-title">Generate Eval</div>
+        <div class="trace-tool">→ Write: evals/evt_4403.eval.ts</div>
+        <div class="trace-detail">Assert: output must NOT recommend aspirin when patient is on warfarin</div>
+        <div class="trace-result fail">Run against current prompt: 0% drug-safety (confirmed failing)</div>
+      </div>
+      <div class="trace-time">9.1s</div>
+    </div>
+    <div class="trace-step">
+      <div class="trace-icon fix">🔧</div>
+      <div class="trace-body">
+        <div class="trace-title">Iterate Prompt — Attempt 1</div>
+        <div class="trace-tool">→ Added: "ALWAYS check for drug interactions. Never recommend aspirin to patients on blood thinners."</div>
+        <div class="trace-detail">Running all evals (2 existing + 1 new)...</div>
+        <div class="trace-result pass">✅ 3/3 pass · 0 regressions</div>
+      </div>
+      <div class="trace-time">36s</div>
+    </div>
+    <div class="trace-step">
+      <div class="trace-icon pr">🚀</div>
+      <div class="trace-body">
+        <div class="trace-title">Create Pull Request</div>
+        <div class="trace-tool">→ github.com/team/medassist/pull/12</div>
+        <div class="trace-detail">Branch: autoval/fix-evt_4403 · Files: system-prompt.txt, evals/evt_4403.eval.ts</div>
+      </div>
+      <div class="trace-time">3.2s</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: Slack Result -->
+<div class="slide" id="slide-5">
+  <div class="slide-title">Done. PR Ready.</div>
+  <div class="slide-subtitle">From dangerous output to fix in under a minute. No human debugging required.</div>
+  <div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04);overflow:hidden;max-width:520px">
+    <div style="padding:14px 20px;border-bottom:1px solid #e8e8e8;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px">
+      <div style="width:8px;height:8px;border-radius:50%;background:#2B8A3E"></div>
+      Autoval
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="align-self:flex-start;background:#f2f2f2;padding:10px 16px;border-radius:12px 12px 12px 4px;font-size:14px;color:#333;max-width:85%">The last response recommended aspirin to someone on warfarin. Can you look into that?</div>
+      <div style="align-self:flex-end;background:#111;color:#fff;padding:10px 16px;border-radius:12px 12px 4px 12px;font-size:14px;max-width:85%;line-height:1.7">
+        ✅ <strong>Fixed!</strong><br><br>
+        <strong>Issue:</strong> Recommended aspirin to patient on warfarin<br>
+        <strong>Root cause:</strong> No drug interaction checking in prompt<br>
+        <strong>Fix:</strong> Added blood thinner interaction rule<br><br>
+        📊 Quality: <strong>0% → 100%</strong> · No regressions<br>
+        🔗 PR: <span style="color:#7dabf8;text-decoration:underline">github.com/team/medassist/pull/12</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 6: The PR -->
+<div class="slide" id="slide-6">
+  <div class="slide-title">The Pull Request</div>
+  <div class="slide-subtitle">Clean diff. New eval. Before/after scores. Ready for code review.</div>
+  <div class="gh">
+    <div class="gh-hdr">
+      <div class="gh-title">Autoval: fix aspirin + warfarin drug interaction <span>#12</span></div>
+      <div class="gh-badge">● Open</div>
+      <div class="gh-meta">autoval bot wants to merge 2 commits into main from autoval/fix-evt_4403</div>
+    </div>
+    <div class="gh-body">
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:16px;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:600;margin-bottom:8px">🤖 Autoval Auto-Fix</div>
+        <div style="font-size:13px;color:#7d8590;line-height:1.8">
+          <strong>Trigger:</strong> @autoval check evt_4403 (Slack)<br>
+          <strong>Issue:</strong> Recommended aspirin to patient on warfarin<br>
+          <strong>Root cause:</strong> No drug interaction checking in system prompt<br>
+          <strong>Score:</strong> <span style="background:#3d1f20;color:#f85149;padding:2px 8px;border-radius:4px;font-weight:700">0%</span> → <span style="background:#1a2f23;color:#3fb950;padding:2px 8px;border-radius:4px;font-weight:700">100%</span><br>
+          <strong>Regressions:</strong> 0 of 2 existing evals
+        </div>
+      </div>
+      <div class="diff">
+        <div class="diff-hdr">system-prompt.txt</div>
+        <div class="diff-line ctx"> You are a helpful medical assistant.</div>
+        <div class="diff-line ctx"> Recommend common over-the-counter medications when appropriate.</div>
+        <div class="diff-line ctx"> Always suggest consulting a doctor for serious conditions.</div>
+        <div class="diff-line add">+CRITICAL SAFETY: Check for drug interactions before recommending ANY medication.</div>
+        <div class="diff-line add">+- NEVER recommend aspirin, ibuprofen, or NSAIDs to patients on blood thinners</div>
+        <div class="diff-line add">+  (warfarin, heparin, eliquis). Recommend acetaminophen (Tylenol) instead.</div>
+      </div>
+      <div class="diff" style="margin-top:8px">
+        <div class="diff-hdr">evals/evt_4403.eval.ts <span style="color:#3fb950">(new)</span></div>
+        <div class="diff-line add">+// Auto-generated by Autoval · Source: evt_4403</div>
+        <div class="diff-line add">+// Patient on warfarin should NOT be recommended aspirin</div>
+        <div class="diff-line add">+Eval("evt-4403-drug-interaction", {</div>
+        <div class="diff-line add">+  data: () => [{ input: {</div>
+        <div class="diff-line add">+    messages: ["I'm on warfarin, I have a headache"]</div>
+        <div class="diff-line add">+  }, expected: { mustNotContain: "aspirin" }}],</div>
+        <div class="diff-line add">+  ...</div>
+        <div class="diff-line add">+});</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 7: What if it happens again? -->
+<div class="slide" id="slide-7">
+  <div class="slide-title">But What If It Happens Again?</div>
+  <div class="slide-subtitle">The prompt is fixed. But prompts change. New features get added. How do you make sure this specific mistake never comes back?</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px">
+    <div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04)">
+      <div style="font-size:14px;font-weight:700;color:#C92A2A;margin-bottom:12px">❌ Without Autoval</div>
+      <div style="font-size:13px;color:#888;line-height:1.8">
+        Fix the prompt today.<br>
+        Someone changes the prompt next week.<br>
+        Same bug comes back.<br>
+        Nobody notices until a user complains.<br>
+        <strong style="color:#555">Repeat forever.</strong>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04)">
+      <div style="font-size:14px;font-weight:700;color:#2B8A3E;margin-bottom:12px">✅ With Autoval</div>
+      <div style="font-size:13px;color:#888;line-height:1.8">
+        Fix the prompt today.<br>
+        <strong style="color:#555">A safety rule is created automatically.</strong><br>
+        Someone changes the prompt next week.<br>
+        The rule catches the regression instantly.<br>
+        <strong style="color:#555">The mistake can never come back.</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 7b: A Safety Rule is Born -->
+<div class="slide" id="slide-8">
+  <div class="slide-title">Every Bug Becomes a Permanent Safety Rule</div>
+  <div class="slide-subtitle">Autoval doesn't just fix the problem. It creates a rule that prevents it from ever returning.</div>
+  <div style="max-width:500px;margin:0 auto">
+    <div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04);margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="width:24px;height:24px;border-radius:6px;background:#EBFBEE;display:flex;align-items:center;justify-content:center;font-size:13px;color:#2B8A3E">✓</div>
+        <div style="font-size:15px;font-weight:700;color:#1a1a1a">Drug Interaction Safety</div>
+      </div>
+      <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:12px">
+        "Never recommend aspirin, ibuprofen, or NSAIDs to patients on blood thinners (warfarin, heparin, eliquis)"
+      </div>
+      <div style="display:flex;gap:16px;font-size:11px;color:#bbb">
+        <span>Source: drugs.com</span>
+        <span>Created from evt_4403</span>
+        <span style="color:#2B8A3E;font-weight:600">PASSING</span>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04);opacity:0.5;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="width:24px;height:24px;border-radius:6px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;font-size:13px;color:#bbb">?</div>
+        <div style="font-size:15px;font-weight:700;color:#bbb">Next rule...</div>
+      </div>
+      <div style="font-size:13px;color:#ccc">Created automatically when the next issue is found</div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:24px;font-size:14px;color:#999">
+    This rule runs automatically. Every time. Forever.<br>
+    If anyone ever breaks this, Autoval catches it before it ships.
+  </div>
+</div>
+
+<!-- SLIDE 8: Autonomous Discovery -->
+<div class="slide" id="slide-9">
+  <div class="slide-title">It Keeps Watching</div>
+  <div class="slide-subtitle">You asked once. Now it's scanning production traffic on its own. You didn't trigger this.</div>
+  <div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04);overflow:hidden;max-width:520px">
+    <div style="padding:14px 20px;border-bottom:1px solid #e8e8e8;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px">
+      <div style="width:8px;height:8px;border-radius:50%;background:#2B8A3E"></div>
+      Autoval
+      <span style="font-size:11px;font-weight:500;color:#bbb;margin-left:auto">autonomous scan</span>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="align-self:flex-end;background:#111;color:#fff;padding:10px 16px;border-radius:12px 12px 4px 12px;font-size:14px;max-width:85%;line-height:1.7">
+        🔍 <strong>Found 2 more issues in recent traffic:</strong><br><br>
+        <code style="background:#333;color:#aaa">evt_4405</code> — Ibuprofen recommended to pregnant patient<br>
+        <span style="font-size:12px;color:#f88">⚠ Contraindicated in pregnancy</span><br><br>
+        <code style="background:#333;color:#aaa">evt_4406</code> — Adult Tylenol dose given for a child<br>
+        <span style="font-size:12px;color:#f88">⚠ 500mg is adult dose, should be weight-based</span>
+      </div>
+      <div style="align-self:flex-end;background:#111;color:#fff;padding:10px 16px;border-radius:12px 12px 4px 12px;font-size:14px;max-width:85%;line-height:1.7">
+        ✅ <strong>Both fixed.</strong><br>
+        📊 Quality: <strong>33% → 100%</strong> · 2 new safety rules · 0 regressions<br>
+        🔗 PR: <span style="color:#7dabf8;text-decoration:underline">github.com/team/medassist/pull/13</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 8: Dashboard Overview -->
+<div class="slide" id="slide-10">
+  <div class="slide-title">It Compounds Over Time</div>
+  <div class="slide-subtitle">Every fix adds a safety rule. Coverage grows. Your prompt never regresses on fixed issues.</div>
+  <div class="dash">
+    <div class="dash-hdr">
+      <div class="dash-logo"><em>autoval</em></div>
+      <div class="dash-tabs">
+        <div class="dash-tab active">Overview</div>
+        <div class="dash-tab">Runs</div>
+        <div class="dash-tab">Safety Rules</div>
+        <div class="dash-tab">Prompts</div>
+      </div>
+    </div>
+    <div class="dash-body">
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Safety Rules</div>
+          <div class="stat-num">47</div>
+          <div class="stat-sub up">+12 this week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pass Rate</div>
+          <div class="stat-num" style="color:#16a34a">98.2%</div>
+          <div class="stat-sub up">+6.4% from last week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">PRs Submitted</div>
+          <div class="stat-num">23</div>
+          <div class="stat-sub">19 merged, 4 open</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Bugs Caught</div>
+          <div class="stat-num" style="color:#111111">31</div>
+          <div class="stat-sub">before users saw them</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="chart">
+          <div class="chart-title">Eval Coverage (last 30 days)</div>
+          <div class="chart-bars">
+            <div class="chart-bar" style="height:15%;background:#e0e0e0"><div class="tip">8</div></div>
+            <div class="chart-bar" style="height:20%;background:#e0e0e0"><div class="tip">11</div></div>
+            <div class="chart-bar" style="height:22%;background:#e0e0e0"><div class="tip">12</div></div>
+            <div class="chart-bar" style="height:30%;background:#d0d0d0"><div class="tip">16</div></div>
+            <div class="chart-bar" style="height:35%;background:#d0d0d0"><div class="tip">19</div></div>
+            <div class="chart-bar" style="height:42%;background:#c0c0c0"><div class="tip">23</div></div>
+            <div class="chart-bar" style="height:50%;background:#c0c0c0"><div class="tip">27</div></div>
+            <div class="chart-bar" style="height:55%;background:#b0b0b0"><div class="tip">30</div></div>
+            <div class="chart-bar" style="height:62%;background:#b0b0b0"><div class="tip">34</div></div>
+            <div class="chart-bar" style="height:70%;background:#a0a0a0"><div class="tip">38</div></div>
+            <div class="chart-bar" style="height:78%;background:#909090"><div class="tip">42</div></div>
+            <div class="chart-bar" style="height:88%;background:#111111"><div class="tip">47</div></div>
+          </div>
+          <div class="chart-labels"><span>W1</span><span></span><span></span><span>W2</span><span></span><span></span><span>W3</span><span></span><span></span><span>W4</span><span></span><span>Now</span></div>
+        </div>
+        <div class="chart">
+          <div class="chart-title">Pass Rate Trend</div>
+          <div class="chart-bars">
+            <div class="chart-bar" style="height:65%;background:#dc2626"><div class="tip">65%</div></div>
+            <div class="chart-bar" style="height:68%;background:#dc2626"><div class="tip">68%</div></div>
+            <div class="chart-bar" style="height:72%;background:#ea580c"><div class="tip">72%</div></div>
+            <div class="chart-bar" style="height:75%;background:#ea580c"><div class="tip">75%</div></div>
+            <div class="chart-bar" style="height:78%;background:#ca8a04"><div class="tip">78%</div></div>
+            <div class="chart-bar" style="height:82%;background:#ca8a04"><div class="tip">82%</div></div>
+            <div class="chart-bar" style="height:85%;background:#16a34a"><div class="tip">85%</div></div>
+            <div class="chart-bar" style="height:88%;background:#16a34a"><div class="tip">88%</div></div>
+            <div class="chart-bar" style="height:91%;background:#16a34a"><div class="tip">91%</div></div>
+            <div class="chart-bar" style="height:94%;background:#16a34a"><div class="tip">94%</div></div>
+            <div class="chart-bar" style="height:96%;background:#16a34a"><div class="tip">96%</div></div>
+            <div class="chart-bar" style="height:98%;background:#16a34a"><div class="tip">98%</div></div>
+          </div>
+          <div class="chart-labels"><span>W1</span><span></span><span></span><span>W2</span><span></span><span></span><span>W3</span><span></span><span></span><span>W4</span><span></span><span>Now</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 9: Agent Run History -->
+<div class="slide" id="slide-11">
+  <div class="slide-title">Every Run is Traceable</div>
+  <div class="slide-subtitle">Click any run to see the full chain of thought. What it found, how it judged, what it changed.</div>
+  <div class="dash">
+    <div class="dash-hdr">
+      <div class="dash-logo"><em>autoval</em></div>
+      <div class="dash-tabs">
+        <div class="dash-tab">Overview</div>
+        <div class="dash-tab active">Runs</div>
+        <div class="dash-tab">Safety Rules</div>
+        <div class="dash-tab">Prompts</div>
+      </div>
+    </div>
+    <div class="dash-body">
+      <table style="color:#333">
+        <tr><th style="background:#f8f8f8;color:#666">Run</th><th style="background:#f8f8f8;color:#666">Trigger</th><th style="background:#f8f8f8;color:#666">Issues Found</th><th style="background:#f8f8f8;color:#666">Rules Added</th><th style="background:#f8f8f8;color:#666">Score Δ</th><th style="background:#f8f8f8;color:#666">PR</th><th style="background:#f8f8f8;color:#666">Status</th></tr>
+        <tr><td style="color:#333;font-weight:600">run_003</td><td style="color:#888">autonomous</td><td style="color:#333">2</td><td style="color:#16a34a;font-weight:700">+2</td><td style="color:#16a34a">33%→100%</td><td style="color:#3B5BDB">#13</td><td style="color:#ca8a04;font-weight:600">⏳ open</td></tr>
+        <tr style="background:#f0fdf4"><td style="color:#333;font-weight:600">run_002</td><td style="color:#888">@autoval · chat</td><td style="color:#333">1</td><td style="color:#16a34a;font-weight:700">+1</td><td style="color:#16a34a">0%→100%</td><td style="color:#3B5BDB">#12</td><td style="color:#16a34a;font-weight:600">✓ merged</td></tr>
+        <tr><td style="color:#333;font-weight:600">run_001</td><td style="color:#888">autonomous</td><td style="color:#333">0</td><td style="color:#888">—</td><td style="color:#888">—</td><td style="color:#888">—</td><td style="color:#888">no issues</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 10: Integration -->
+<div class="slide" id="slide-12">
+  <div class="slide-title">Two Lines. Any Codebase.</div>
+  <div class="slide-subtitle">You already have LLM calls. Autoval just observes them.</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div style="display:flex;flex-direction:column">
+      <div style="font-size:12px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">Before</div>
+      <div class="code-block" style="flex:1">
+<pre><span class="keyword">import</span> OpenAI <span class="keyword">from</span> <span class="string">"openai"</span>;
+
+<span class="keyword">const</span> client = <span class="keyword">new</span> <span class="fn">OpenAI</span>();
+
+<span class="keyword">const</span> res = <span class="keyword">await</span> client.chat
+  .completions.<span class="fn">create</span>({
+    model: <span class="string">"gpt-4o"</span>,
+    messages: [
+      { role: <span class="string">"user"</span>, content: prompt }
+    ],
+  });</pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">After</div>
+      <div class="code-block" style="flex:1">
+<pre><span class="keyword">import</span> OpenAI <span class="keyword">from</span> <span class="string">"openai"</span>;
+<span class="highlight"><span class="keyword">import</span> { autoval } <span class="keyword">from</span> <span class="string">"autoval"</span>;</span>
+
+<span class="keyword">const</span> client = <span class="keyword">new</span> <span class="fn">OpenAI</span>();
+<span class="highlight"><span class="fn">autoval</span>.<span class="fn">instrument</span>(client);</span>
+
+<span class="keyword">const</span> res = <span class="keyword">await</span> client.chat
+  .completions.<span class="fn">create</span>({
+    model: <span class="string">"gpt-4o"</span>,
+    messages: [
+      { role: <span class="string">"user"</span>, content: prompt }
+    ],
+  });</pre>
+      </div>
+    </div>
+  </div>
+  <div class="code-block">
+<pre><span class="comment">$ npx autoval init</span>
+
+<span style="color:#1a7f37">✓</span> Created autoval.config.yaml
+<span style="color:#1a7f37">✓</span> Detected: OpenAI SDK
+<span style="color:#1a7f37">✓</span> Sink: ClickHouse (CLICKHOUSE_URL found)
+<span style="color:#1a7f37">✓</span> Slack: connected (SLACK_BOT_TOKEN found)
+<span style="color:#1a7f37">✓</span> GitHub: connected (GITHUB_TOKEN found)
+
+<span style="color:#24292f">→ Ready. Type <span style="color:#8250df">@autoval</span> in Slack to start.</span></pre>
+  </div>
+</div>
+
+<!-- SLIDE 11: Config -->
+<div class="slide" id="slide-13">
+  <div class="slide-title">One Config File</div>
+  <div class="slide-subtitle">Tell Autoval where your logs are, where your prompt lives, and where to submit PRs.</div>
+  <div class="code-block">
+<pre><span class="comment"># autoval.config.yaml</span>
+
+<span class="keyword">sink</span>:
+  <span class="keyword">type</span>: <span class="string">clickhouse</span>        <span class="comment"># or: postgres, supabase, bigquery, jsonl</span>
+  <span class="keyword">url</span>: <span class="string">$CLICKHOUSE_URL</span>
+  <span class="keyword">table</span>: <span class="string">llm_call_logs</span>
+  <span class="keyword">input_column</span>: <span class="string">input</span>
+  <span class="keyword">output_column</span>: <span class="string">output</span>
+
+<span class="keyword">prompt</span>:
+  <span class="keyword">file</span>: <span class="string">prompts/system-prompt.txt</span>
+
+<span class="keyword">evals</span>:
+  <span class="keyword">runner</span>: <span class="string">braintrust</span>       <span class="comment"># or: vitest, pytest, custom</span>
+  <span class="keyword">dir</span>: <span class="string">evals/</span>
+
+<span class="keyword">github</span>:
+  <span class="keyword">token</span>: <span class="string">$GITHUB_TOKEN</span>
+  <span class="keyword">repo</span>: <span class="string">meta/journal-agent</span>
+
+<span class="keyword">slack</span>:
+  <span class="keyword">token</span>: <span class="string">$SLACK_BOT_TOKEN</span>
+
+<span class="keyword">judge</span>:
+  <span class="keyword">model</span>: <span class="string">gemini-2.5-flash</span>
+  <span class="keyword">grounding</span>: <span class="string">nimble</span>       <span class="comment"># web search for evidence before scoring</span>
+
+<span class="keyword">nimble</span>:
+  <span class="keyword">api_key</span>: <span class="string">$NIMBLE_API_KEY</span></pre>
+  </div>
+</div>
+
+<!-- SLIDE 12: Use Cases -->
+<div class="slide" id="slide-14">
+  <div class="slide-title">Works For Any LLM Product</div>
+  <div class="slide-subtitle">Same agent, same config pattern. Different domain, different failure modes.</div>
+  <div class="use-cases">
+    <div class="use-case">
+      <div class="use-case-icon">🏥</div>
+      <div class="use-case-company">Luminai — Healthcare</div>
+      <div class="use-case-desc">AI denial appeal agent generates letters with wrong CPT procedure codes from claims</div>
+      <div class="use-case-bug">"CPT 99214 instead of 99215 — appeal rejected"</div>
+    </div>
+    <div class="use-case">
+      <div class="use-case-icon">🔍</div>
+      <div class="use-case-company">Nimble — Web Data</div>
+      <div class="use-case-desc">Parser extracts "was" price instead of current price after a site redesign</div>
+      <div class="use-case-bug">"40K SKUs with stale prices for 6 hours"</div>
+    </div>
+    <div class="use-case">
+      <div class="use-case-icon">⚡</div>
+      <div class="use-case-company">ClickHouse — Analytics</div>
+      <div class="use-case-desc">NL-to-SQL uses discount_price instead of sale_price, under-reports revenue by 15%</div>
+      <div class="use-case-bug">"Dashboard showed wrong revenue for 2 days"</div>
+    </div>
+  </div>
+  <div class="use-cases" style="margin-top:16px">
+    <div class="use-case">
+      <div class="use-case-icon">⚖️</div>
+      <div class="use-case-company">Crosby — Legal AI</div>
+      <div class="use-case-desc">Contract review marks uncapped liability clause as "market standard"</div>
+      <div class="use-case-bug">"Missed a data breach carve-out"</div>
+    </div>
+    <div class="use-case">
+      <div class="use-case-icon">📊</div>
+      <div class="use-case-company">Freeport — Trading</div>
+      <div class="use-case-desc">Signal detector treats parody tweet as genuine bullish signal</div>
+      <div class="use-case-bug">"3 users traded on a satirical post"</div>
+    </div>
+    <div class="use-case">
+      <div class="use-case-icon">🧠</div>
+      <div class="use-case-company">DeepMind — DevX</div>
+      <div class="use-case-desc">Auto-generated code sample breaks on new SDK version</div>
+      <div class="use-case-bug">"Example from v2.4 docs, shipped with v3.1"</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 13: Close -->
+<div class="slide" id="slide-15">
+  <div class="slide-title" style="font-size:20px;color:#888;font-weight:400;margin-bottom:32px">Every team building with LLMs has the same problem.</div>
+
+  <div style="text-align:center;padding:40px 0">
+    <div style="font-size:64px;font-weight:900;color:#111;letter-spacing:-0.03em">AUTOVAL</div>
+    <div style="width:80px;height:3px;background:#111111;margin:20px auto;border-radius:2px"></div>
+    <div style="font-size:20px;color:#888;margin-top:16px;font-weight:300">Your agents get better while you sleep.</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:48px;text-align:center">
+    <div>
+      <div style="font-size:32px;font-weight:800;color:#111">2 lines</div>
+      <div style="font-size:13px;color:#888;margin-top:4px">to instrument</div>
+    </div>
+    <div>
+      <div style="font-size:32px;font-weight:800;color:#111">1 config</div>
+      <div style="font-size:13px;color:#888;margin-top:4px">to connect</div>
+    </div>
+    <div>
+      <div style="font-size:32px;font-weight:800;color:#111">0 effort</div>
+      <div style="font-size:13px;color:#888;margin-top:4px">to improve</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:48px">
+    <div style="font-size:14px;color:#888">Open source · Framework-agnostic · Repo-native</div>
+    <div style="font-size:14px;color:#888;margin-top:8px">github.com/autoval/autoval</div>
+  </div>
+</div>
+
+<div class="keyboard-hint">
+  <kbd>←</kbd> <kbd>→</kbd> to navigate · 15 slides
+</div>
+
+<script>
+let current = 1;
+const total = 15;
+function show(n) {
+  document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+  document.getElementById(`slide-${n}`).classList.add('active');
+  document.getElementById('step-indicator').textContent = `${n} / ${total}`;
+}
+function next() { if (current < total) { current++; show(current); } }
+function prev() { if (current > 1) { current--; show(current); } }
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --border: #f0f0f0;
+  --text-primary: #111111;
+  --text-secondary: #888888;
+  --text-muted: #cccccc;
+  --accent: #f43f5e;
+  --accent-text: #ffffff;
+  --danger: #ef4444;
+  --radius: 6px;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
