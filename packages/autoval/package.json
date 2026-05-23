@@ -1,0 +1,43 @@
+{
+  "name": "autoval",
+  "version": "0.1.0",
+  "description": "Two lines, any codebase. Instrument your LLM client so Autoval can scan, eval, and PR-fix your prompts.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "llm",
+    "eval",
+    "observability",
+    "openai",
+    "anthropic",
+    "gemini",
+    "clickhouse",
+    "autoval"
+  ],
+  "author": "Autoval team",
+  "license": "MIT",
+  "dependencies": {
+    "@clickhouse/client": "^1.18.0"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.20.0",
+    "@google/generative-ai": ">=0.20.0",
+    "openai": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": { "optional": true },
+    "@google/generative-ai": { "optional": true },
+    "openai": { "optional": true }
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
