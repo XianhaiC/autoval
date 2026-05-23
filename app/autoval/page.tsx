@@ -59,11 +59,45 @@ export default function AutovalPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [scanStatus, setScanStatus] = useState('')
+  const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  function toggleScanner() {
+    if (scanning) {
+      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+      setScanning(false)
+      setScanStatus('Scanner stopped')
+    } else {
+      setScanning(true)
+      setScanStatus('Scanner active — polling every 30s')
+      runScan()
+      scanIntervalRef.current = setInterval(runScan, 30000)
+    }
+  }
+
+  async function runScan() {
+    try {
+      setScanStatus('Scanning...')
+      const res = await fetch('/api/eval/scan', { method: 'POST' })
+      const data = await res.json()
+      if (data.status === 'idle') {
+        setScanStatus('No unscored logs found — waiting...')
+      } else if (data.status === 'completed') {
+        setScanStatus(`Found ${data.rows_scanned} issue(s) — run ${data.run_id?.slice(0, 8)}`)
+      } else {
+        setScanStatus(`Scan error: ${data.message}`)
+      }
+    } catch {
+      setScanStatus('Scan failed — will retry')
+    }
+  }
 
   async function handleSend() {
     if (!input.trim() || loading) return
@@ -157,6 +191,19 @@ export default function AutovalPage() {
         <h1 className="text-[18px] font-bold">Autoval</h1>
         <span className="text-[12px] text-[#bbb]">eval agent</span>
         <div className="flex-1" />
+        {scanStatus && (
+          <span className="text-[11px] text-[#999] mr-2">{scanStatus}</span>
+        )}
+        <button
+          onClick={toggleScanner}
+          className={`px-3 py-1.5 rounded-[6px] text-[12px] font-semibold mr-3 ${
+            scanning
+              ? 'bg-[#FFF5F5] text-[#C92A2A] border border-[#C92A2A]'
+              : 'bg-[#EBFBEE] text-[#2B8A3E] border border-[#2B8A3E]'
+          }`}
+        >
+          {scanning ? 'Stop Scanner' : 'Start Scanner'}
+        </button>
         <a href="/dashboard" className="text-[13px] text-[#666] hover:text-[#111]">Dashboard</a>
       </div>
 
