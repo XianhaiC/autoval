@@ -28,16 +28,17 @@ interface EvalStep {
   created_at: string
 }
 
-const TOOL_LABELS: Record<string, { icon: string; label: string; color: string }> = {
-  query_clickhouse: { icon: '🔍', label: 'Query ClickHouse', color: '#EDF2FF' },
-  nimble_web_search: { icon: '🌐', label: 'Web Search (Nimble)', color: '#FFF4E6' },
+const TOOL_LABELS: Record<string, { icon: string; label: string; color: string; logoSrc?: string }> = {
+  query_clickhouse: { icon: '🔍', label: 'Query ClickHouse', color: '#EDF2FF', logoSrc: '/clickhouse-small.png' },
+  nimble_web_search: { icon: '🌐', label: 'Web Search (Nimble)', color: '#FFF4E6', logoSrc: '/nimble.png' },
   judge_output: { icon: '⚖️', label: 'Judge Output', color: '#F3F0FF' },
   generate_safety_rule: { icon: '📝', label: 'Generate Safety Rule', color: '#EBFBEE' },
   test_prompt_fix: { icon: '🔧', label: 'Test Prompt Fix', color: '#FFF9DB' },
   read_prompt: { icon: '📄', label: 'Read System Prompt', color: '#F3F0FF' },
   read_evals: { icon: '📋', label: 'Read Safety Rules', color: '#F3F0FF' },
+  check_open_prs: { icon: '🔎', label: 'Check Open PRs', color: '#EDF2FF' },
   create_pull_request: { icon: '🚀', label: 'Create Pull Request', color: '#FFF4E6' },
-  scan_recent_logs: { icon: '📊', label: 'Scan Recent Logs', color: '#EDF2FF' },
+  scan_recent_logs: { icon: '📊', label: 'Scan Recent Logs', color: '#EDF2FF', logoSrc: '/clickhouse-small.png' },
   complete_run: { icon: '✅', label: 'Complete', color: '#EBFBEE' },
 }
 
@@ -51,7 +52,11 @@ function StepCard({ step }: { step: EvalStep }) {
       onClick={() => setExpanded(!expanded)}
     >
       <div className="flex items-center gap-3 px-4 py-3" style={{ background: info.color }}>
-        <span className="text-[14px]">{info.icon}</span>
+        {info.logoSrc ? (
+          <img src={info.logoSrc} alt="" className="h-[16px] w-[16px] object-contain" />
+        ) : (
+          <span className="text-[14px]">{info.icon}</span>
+        )}
         <span className="text-[13px] font-semibold text-[#333] flex-1">{info.label}</span>
         <span className="text-[11px] text-[#999]">{step.duration_ms}ms</span>
       </div>
