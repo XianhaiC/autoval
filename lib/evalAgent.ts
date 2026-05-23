@@ -136,11 +136,11 @@ const tools: FunctionDeclaration[] = [
   },
   {
     name: 'scan_recent_logs',
-    description: 'Scan recent logs for potential quality issues.',
+    description: 'Fetch ALL recent LLM call logs. Returns every log entry from the last N hours. Use this to see everything and identify problematic outputs.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        minutes: { type: SchemaType.NUMBER, description: 'Minutes back to scan. Default 60.' },
+        hours: { type: SchemaType.NUMBER, description: 'Hours back to scan. Default 24.' },
       },
     },
   },
@@ -231,9 +231,9 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       break
 
     case 'scan_recent_logs': {
-      const minutes = (args.minutes as number) || 60
+      const hours = (args.hours as number) || 24
       result = await executeQueryClickhouse({
-        sql: `SELECT * FROM llm_call_logs WHERE scored = 0 AND timestamp > now() - INTERVAL ${minutes} MINUTE ORDER BY timestamp DESC LIMIT 20`,
+        sql: `SELECT * FROM autoval.llm_call_logs WHERE timestamp > now() - INTERVAL ${hours} HOUR ORDER BY timestamp DESC LIMIT 50`,
       })
       break
     }
