@@ -157,9 +157,9 @@ export default function AutovalPage() {
       setScanStatus('Scanner stopped')
     } else {
       setScanning(true)
-      setScanStatus('Scanner active — polling every 30s')
+      setScanStatus('Scanner active — polling every 5 min')
       runScan()
-      scanIntervalRef.current = setInterval(runScan, 30000)
+      scanIntervalRef.current = setInterval(runScan, 5 * 60 * 1000)
     }
   }
 

@@ -7,17 +7,17 @@ import { createRun, insertStep, completeRun } from '@/lib/persistRun'
 // Scan for unscored logs and run the agent on each
 export async function POST() {
   try {
-    // Find unscored rows
+    // Fetch all logs from last 6 hours
     const rows = await queryLogs(
-      'SELECT * FROM llm_call_logs WHERE scored = 0 ORDER BY timestamp DESC LIMIT 5'
+      'SELECT * FROM autoval.llm_call_logs WHERE timestamp > now() - INTERVAL 6 HOUR ORDER BY timestamp DESC LIMIT 50'
     ) as Record<string, unknown>[]
 
     if (!rows || rows.length === 0) {
-      return Response.json({ status: 'idle', message: 'No unscored logs found' })
+      return Response.json({ status: 'idle', message: 'No logs found in the last 6 hours' })
     }
 
     // Start an agent run for the batch
-    const runId = await createRun(`[auto] Scanning ${rows.length} unscored log(s)`)
+    const runId = await createRun(`[auto] Scanning ${rows.length} log(s) from last 6 hours`)
 
     const summaries: string[] = []
 
@@ -26,7 +26,7 @@ export async function POST() {
       `ID: ${r.id}\nInput: ${String(r.input).slice(0, 200)}\nOutput: ${String(r.output).slice(0, 200)}`
     ).join('\n---\n')
 
-    const message = `I found ${rows.length} unscored log entries. Please investigate each one for quality issues:\n\n${rowSummary}`
+    const message = `Here are ${rows.length} recent log entries from the last 6 hours. Please review each one for quality issues:\n\n${rowSummary}`
 
     try {
       for await (const step of runEvalAgent(message, [])) {
