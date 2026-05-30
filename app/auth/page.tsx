@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/lib/supabase'
+import { Button } from '@/components/ui/button'
 
 export default function AuthPage() {
   const [email, setEmail] = useState('')
@@ -18,21 +19,37 @@ export default function AuthPage() {
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError('Wrong email or password.'); setLoading(false); return }
-    router.push('/')
+    router.push('/autoval')
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <form onSubmit={handleSubmit} className="w-full max-w-[320px] space-y-4">
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
-          className="w-full h-[44px] px-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] text-[15px] outline-none focus:border-[var(--text-primary)]" required />
-        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
-          className="w-full h-[44px] px-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] text-[15px] outline-none focus:border-[var(--text-primary)]" required />
-        {error && <p className="text-[var(--danger)] text-[13px]">{error}</p>}
-        <button type="submit" disabled={loading}
-          className="w-full h-[44px] rounded-[var(--radius)] bg-[var(--text-primary)] text-white text-[15px] font-bold disabled:opacity-50">
+        <div className="text-center mb-6">
+          <img src="/logo.svg" alt="Autoval" className="h-10 mx-auto mb-3" />
+          <h1 className="text-xl font-semibold text-foreground">Autoval</h1>
+          <p className="text-sm text-muted-foreground">Sign in to continue</p>
+        </div>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full h-10 px-4 rounded-md border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+          required
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full h-10 px-4 rounded-md border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+          required
+        />
+        {error && <p className="text-destructive text-sm">{error}</p>}
+        <Button type="submit" disabled={loading} className="w-full">
           {loading ? 'Signing in...' : 'Sign in'}
-        </button>
+        </Button>
       </form>
     </div>
   )
