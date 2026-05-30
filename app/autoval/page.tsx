@@ -1,169 +1,434 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useChat } from '@ai-sdk/react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { DefaultChatTransport } from 'ai'
+import type { UIMessage } from 'ai'
+import ReactMarkdown from 'react-markdown'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Plus, MessageSquare, Trash2, PanelLeftClose, PanelLeft, Send, ChevronDown } from 'lucide-react'
 
-interface EvalStep {
-  tool_name: string
-  tool_args: Record<string, unknown>
-  tool_result: unknown
-  duration_ms: number
-  timestamp: string
+// ---------------------------------------------------------------------------
+// Types & constants
+// ---------------------------------------------------------------------------
+
+const TOOL_LABELS: Record<string, string> = {
+  query_clickhouse: 'Queried ClickHouse',
+  nimble_web_search: 'Searched the web',
+  judge_output: 'Judged output',
+  generate_safety_rule: 'Generated safety rule',
+  test_prompt_fix: 'Tested prompt fix',
+  read_prompt: 'Read system prompt',
+  read_evals: 'Read safety rules',
+  check_open_prs: 'Checked open PRs',
+  create_pull_request: 'Created pull request',
+  scan_recent_logs: 'Scanned recent logs',
+  complete_run: 'Completed run',
 }
 
-interface Message {
-  role: 'user' | 'agent'
-  content?: string
-  steps?: EvalStep[]
+interface ToolPart {
+  type: string
+  toolCallId: string
+  toolName: string
+  state: string
+  input: Record<string, unknown>
+  output?: unknown
 }
 
-const TOOL_LABELS: Record<string, { icon: string; label: string; color: string; logoSrc?: string }> = {
-  query_clickhouse: { icon: '🔍', label: 'Query ClickHouse', color: '#EDF2FF', logoSrc: '/clickhouse-small.png' },
-  nimble_web_search: { icon: '🌐', label: 'Web Search (Nimble)', color: '#FFF4E6', logoSrc: '/nimble.png' },
-  judge_output: { icon: '⚖️', label: 'Judge Output', color: '#F3F0FF' },
-  generate_safety_rule: { icon: '📝', label: 'Generate Safety Rule', color: '#EBFBEE' },
-  test_prompt_fix: { icon: '🔧', label: 'Test Prompt Fix', color: '#FFF9DB' },
-  read_prompt: { icon: '📄', label: 'Read System Prompt', color: '#F3F0FF' },
-  read_evals: { icon: '📋', label: 'Read Safety Rules', color: '#F3F0FF' },
-  check_open_prs: { icon: '🔎', label: 'Check Open PRs', color: '#EDF2FF' },
-  create_pull_request: { icon: '🚀', label: 'Create Pull Request', color: '#FFF4E6' },
-  scan_recent_logs: { icon: '📊', label: 'Scan Recent Logs', color: '#EDF2FF', logoSrc: '/clickhouse-small.png' },
-  complete_run: { icon: '✅', label: 'Complete', color: '#EBFBEE' },
+interface ConversationListItem {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
 }
 
-// Tools that get grouped into "Eval Pipeline" section
-const EVAL_PIPELINE_TOOLS = new Set([
-  'generate_safety_rule', 'read_prompt', 'read_evals', 'test_prompt_fix',
-])
+// ---------------------------------------------------------------------------
+// Tool call (inline, Cursor-style)
+// ---------------------------------------------------------------------------
 
-function TestResultsSummary({ result }: { result: Record<string, unknown> }) {
-  const results = result?.results as { total?: number; passed?: number; failed?: number; details?: { name: string; passed: boolean; reason: string }[] } | undefined
-  if (!results || !results.details) return null
-
-  return (
-    <div className="space-y-1">
-      {results.details.map((d, i) => (
-        <div key={i} className="flex items-center gap-2 text-[12px]">
-          <span className={d.passed ? 'text-[#2B8A3E]' : 'text-[#C92A2A]'}>{d.passed ? 'PASS' : 'FAIL'}</span>
-          <span className="text-[#333]">{d.name}</span>
-          {!d.passed && <span className="text-[#999]">— {d.reason}</span>}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function StepCard({ step }: { step: EvalStep }) {
-  const info = TOOL_LABELS[step.tool_name] || { icon: '⚙️', label: step.tool_name, color: '#f2f2f2' }
+function InlineToolCall({ part }: { part: ToolPart }) {
   const [expanded, setExpanded] = useState(false)
+  const label = TOOL_LABELS[part.toolName] || part.toolName
+  const isComplete = part.state === 'output-available'
+  const isJudge = part.toolName === 'judge_output' && isComplete
+  const verdict = isJudge ? (part.input?.verdict as string) : null
+  const reason = isJudge ? (part.input?.reason as string) : null
+  const userInput = isJudge ? (part.input?.input as string) : null
 
-  // Special rendering for test_prompt_fix — show pass/fail inline
-  const isTestResult = step.tool_name === 'test_prompt_fix'
-  const testResults = step.tool_result as { results?: { total?: number; passed?: number; failed?: number } } | undefined
-  const hasResults = isTestResult && testResults?.results && (testResults.results.total ?? 0) > 0
+  const isTest = part.toolName === 'test_prompt_fix' && isComplete
+  const testResults = part.output as { results?: { total?: number; passed?: number; failed?: number; details?: { name: string; passed: boolean; reason: string }[] } } | undefined
+  const hasTestResults = isTest && testResults?.results && (testResults.results.total ?? 0) > 0
 
-  return (
-    <div
-      className="rounded-[8px] border border-[#e8e8e8] overflow-hidden cursor-pointer"
-      onClick={() => setExpanded(!expanded)}
-    >
-      <div className="flex items-center gap-3 px-3 py-2" style={{ background: info.color }}>
-        {info.logoSrc ? (
-          <img src={info.logoSrc} alt="" className="h-[16px] w-[16px] object-contain" />
-        ) : (
-          <span className="text-[14px]">{info.icon}</span>
-        )}
-        <span className="text-[13px] font-semibold text-[#333] flex-1">{info.label}</span>
-        {hasResults && (
-          <span className={`text-[11px] font-bold ${testResults.results!.failed === 0 ? 'text-[#2B8A3E]' : 'text-[#C92A2A]'}`}>
-            {testResults.results!.passed}/{testResults.results!.total} passed
-          </span>
-        )}
-        <span className="text-[11px] text-[#999]">{step.duration_ms}ms</span>
-      </div>
-      {/* Show test results summary inline for test_prompt_fix */}
-      {hasResults && !expanded && (
-        <div className="px-3 py-2 bg-[#fafafa]">
-          <TestResultsSummary result={step.tool_result as Record<string, unknown>} />
-        </div>
-      )}
-      {expanded && (
-        <div className="px-3 py-2 bg-[#fafafa] text-[12px] font-mono text-[#666] max-h-[200px] overflow-auto">
-          <div className="mb-1 text-[11px] text-[#999] uppercase font-sans font-semibold">Args</div>
-          <pre className="whitespace-pre-wrap break-all">{JSON.stringify(step.tool_args, null, 2)}</pre>
-          <div className="mt-2 mb-1 text-[11px] text-[#999] uppercase font-sans font-semibold">Result</div>
-          <pre className="whitespace-pre-wrap break-all">{JSON.stringify(step.tool_result, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function EvalPipelineGroup({ steps }: { steps: EvalStep[] }) {
-  const [expanded, setExpanded] = useState(false)
-  const testStep = steps.find((s) => s.tool_name === 'test_prompt_fix')
-  const testResults = testStep?.tool_result as { results?: { total?: number; passed?: number; failed?: number } } | undefined
-  const totalTime = steps.reduce((t, s) => t + s.duration_ms, 0)
+  // Summary text for the inline display
+  let summary = ''
+  if (part.toolName === 'scan_recent_logs') {
+    const rows = Array.isArray(part.output) ? part.output.length : 0
+    summary = rows > 0 ? ` -- ${rows} logs found` : ' -- no logs found'
+  } else if (part.toolName === 'nimble_web_search') {
+    summary = part.input?.query ? ` "${(part.input.query as string).slice(0, 50)}"` : ''
+  } else if (part.toolName === 'create_pull_request') {
+    const prUrl = (part.output as Record<string, unknown>)?.pr_url as string
+    if (prUrl) summary = ` -> ${prUrl.split('/').slice(-2).join('/')}`
+  }
 
   return (
-    <div className="rounded-[8px] border border-[#e8e8e8] overflow-hidden">
-      <div
-        className="flex items-center gap-3 px-3 py-2 cursor-pointer"
-        style={{ background: '#FFF9DB' }}
+    <div className="my-1">
+      {/* Inline tool label */}
+      <button
         onClick={() => setExpanded(!expanded)}
+        className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
       >
-        <span className="text-[14px]">🧪</span>
-        <span className="text-[13px] font-semibold text-[#333] flex-1">
-          Eval Pipeline
-          <span className="text-[11px] font-normal text-[#999] ml-2">({steps.length} steps)</span>
-        </span>
-        {testResults?.results && (
-          <span className={`text-[11px] font-bold ${testResults.results.failed === 0 ? 'text-[#2B8A3E]' : 'text-[#C92A2A]'}`}>
-            {testResults.results.passed}/{testResults.results.total} passed
-          </span>
+        {!isComplete && <span className="w-3 h-3 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />}
+        <span>{label}{summary}</span>
+        {hasTestResults && (
+          <Badge variant={testResults.results!.failed === 0 ? 'success' : 'danger'} className="text-[10px] px-1.5 py-0 ml-1">
+            {testResults.results!.passed}/{testResults.results!.total} passed
+          </Badge>
         )}
-        <span className="text-[11px] text-[#999]">{totalTime}ms</span>
-      </div>
-      {/* Always show test results summary */}
-      {testStep && (
-        <div className="px-3 py-2 bg-[#fafafa] border-t border-[#e8e8e8]">
-          <TestResultsSummary result={testStep.tool_result as Record<string, unknown>} />
+        {isJudge && verdict && (
+          <Badge variant={verdict.toUpperCase() === 'SAFE' ? 'success' : 'danger'} className="text-[10px] px-1.5 py-0 ml-1">
+            {verdict.toUpperCase()}
+          </Badge>
+        )}
+        <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+      </button>
+
+      {/* Judge verdict detail */}
+      {isJudge && expanded && (
+        <div className="mt-2 ml-4 pl-3 border-l-2 border-border text-sm space-y-1">
+          {userInput && <p className="text-muted-foreground font-mono text-xs">input: &quot;{userInput.slice(0, 100)}&quot;</p>}
+          {reason && <p className="text-foreground leading-relaxed">{reason}</p>}
         </div>
       )}
-      {expanded && (
-        <div className="px-3 py-2 space-y-2 bg-[#fafafa] border-t border-[#e8e8e8]">
-          {steps.map((step, i) => (
-            <StepCard key={i} step={step} />
+
+      {/* Test results detail */}
+      {hasTestResults && expanded && (
+        <div className="mt-2 ml-4 pl-3 border-l-2 border-border space-y-1">
+          {testResults.results!.details?.map((d, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs">
+              <span className={d.passed ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>{d.passed ? 'PASS' : 'FAIL'}</span>
+              <span className="text-foreground">{d.name}</span>
+            </div>
           ))}
         </div>
       )}
+
+      {/* Raw data (non-judge, non-test) */}
+      {expanded && !isJudge && !hasTestResults && (
+        <div className="mt-2 ml-4 pl-3 border-l-2 border-border">
+          <pre className="text-xs font-mono text-muted-foreground max-h-[200px] overflow-auto whitespace-pre-wrap break-all">
+            {JSON.stringify(part.output ?? part.input, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }
 
+// ---------------------------------------------------------------------------
+// Thinking block (collapsible, Cursor-style)
+// ---------------------------------------------------------------------------
+
+function ThinkingBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+      >
+        <span className="italic">{expanded ? 'Thought' : 'Thinking...'}</span>
+        <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+      </button>
+      {expanded && (
+        <div className="mt-1.5 pl-3 border-l-2 border-border text-[13px] text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
+          {text}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Message renderer (Cursor-style)
+// ---------------------------------------------------------------------------
+
+type Segment =
+  | { type: 'text'; content: string }
+  | { type: 'tools'; tools: ToolPart[] }
+  | { type: 'reasoning'; content: string }
+
+function MessageContent({ message }: { message: UIMessage }) {
+  if (message.role === 'user') {
+    const text = message.parts.find(p => p.type === 'text')
+    return (
+      <div data-segment-marker className="px-5 py-3 border border-border rounded-lg bg-card my-4">
+        <span className="text-[15px] text-foreground">{text && 'text' in text ? text.text : ''}</span>
+      </div>
+    )
+  }
+
+  // Assistant
+  const toolParts: ToolPart[] = []
+  const segments: Segment[] = []
+  let currentToolBatch: ToolPart[] = []
+
+  function flushTools() {
+    if (currentToolBatch.length > 0) {
+      segments.push({ type: 'tools', tools: [...currentToolBatch] })
+      currentToolBatch = []
+    }
+  }
+
+  for (const part of message.parts) {
+    if (part.type === 'text' && 'text' in part && part.text) {
+      flushTools()
+      segments.push({ type: 'text', content: part.text })
+    } else if (part.type === 'reasoning' && 'reasoning' in part) {
+      flushTools()
+      segments.push({ type: 'reasoning', content: (part as unknown as { reasoning: string }).reasoning })
+    } else if (part.type.startsWith('tool-')) {
+      const toolName = part.type.slice(5)
+      const p = part as unknown as Record<string, unknown>
+      const tp: ToolPart = {
+        type: part.type,
+        toolCallId: (p.toolCallId as string) || '',
+        toolName,
+        state: (p.state as string) || 'output-available',
+        input: (p.input as Record<string, unknown>) || {},
+        output: p.output,
+      }
+      toolParts.push(tp)
+      currentToolBatch.push(tp)
+    }
+  }
+  flushTools()
+
+  // Find PR URL
+  const prPart = toolParts.find(tp => tp.toolName === 'create_pull_request' && tp.state === 'output-available')
+  const prUrl = (prPart?.output as Record<string, unknown>)?.pr_url as string | undefined
+
+  return (
+    <div className="my-4 px-1">
+      {segments.map((seg, i) => {
+        if (seg.type === 'reasoning') {
+          return <div key={i} data-segment-marker><ThinkingBlock text={seg.content} /></div>
+        }
+        if (seg.type === 'text') {
+          return (
+            <div key={i} data-segment-marker className="text-[15px] text-foreground leading-relaxed mb-3 prose prose-sm prose-neutral max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-headings:my-3 prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-pre:bg-muted prose-pre:rounded-lg prose-a:text-primary prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-primary/80">
+              <ReactMarkdown components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{seg.content}</ReactMarkdown>
+            </div>
+          )
+        }
+        return (
+          <div key={i} data-segment-marker className="mb-3">
+            {seg.tools!.map((tp, j) => (
+              <InlineToolCall key={j} part={tp} />
+            ))}
+          </div>
+        )
+      })}
+
+      {prUrl && (
+        <a href={prUrl} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline mb-3">
+          Pull request created {'->'} {prUrl.split('/').slice(-2).join('/')}
+        </a>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar
+// ---------------------------------------------------------------------------
+
+function Sidebar({
+  conversations, activeId, onSelect, onNew, onDelete, collapsed, onToggle, scanStatus, scanning, onToggleScanner,
+}: {
+  conversations: ConversationListItem[]
+  activeId: string | null
+  onSelect: (id: string) => void
+  onNew: () => void
+  onDelete: (id: string) => void
+  collapsed: boolean
+  onToggle: () => void
+  scanStatus: string
+  scanning: boolean
+  onToggleScanner: () => void
+}) {
+  if (collapsed) {
+    return (
+      <div className="w-11 border-r bg-muted/30 flex flex-col items-center py-3 gap-2 shrink-0">
+        <button onClick={onToggle} className="p-1.5 rounded hover:bg-muted transition-colors">
+          <PanelLeft className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <button onClick={onNew} className="p-1.5 rounded hover:bg-muted transition-colors">
+          <Plus className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-56 border-r bg-muted/30 flex flex-col shrink-0">
+      <div className="p-2.5 flex items-center gap-1.5">
+        <button onClick={onToggle} className="p-1.5 rounded hover:bg-muted transition-colors">
+          <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <div className="flex-1" />
+      </div>
+      <div className="px-2.5 mb-2">
+        <Button variant="outline" size="sm" onClick={onNew} className="w-full justify-start text-xs gap-1.5 h-8">
+          <Plus className="h-3.5 w-3.5" />
+          New Agent
+        </Button>
+      </div>
+      <div className="px-2.5 mb-1">
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Today</span>
+      </div>
+      <div className="flex-1 overflow-y-auto px-1.5">
+        {conversations.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-6">No conversations yet</p>
+        )}
+        {conversations.map((c) => (
+          <div
+            key={c.id}
+            className={`group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer mb-0.5 transition-colors ${
+              c.id === activeId ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+            onClick={() => onSelect(c.id)}
+          >
+            <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] truncate">{c.title}</p>
+            </div>
+            <button
+              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-all"
+              onClick={(e) => { e.stopPropagation(); onDelete(c.id) }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="p-2.5 border-t space-y-1.5">
+        {scanStatus && <p className="text-[10px] text-muted-foreground truncate">{scanStatus}</p>}
+        <button onClick={onToggleScanner} className="w-full text-left text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors">
+          {scanning ? 'Stop Scanner' : 'Auto-Scan'}
+        </button>
+        <a href="/dashboard" className="block text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors">
+          Dashboard
+        </a>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
 export default function AutovalPage() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const { messages, sendMessage, setMessages, status } = useChat({
+    transport: new DefaultChatTransport({ api: '/api/eval/chat' }),
+  })
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanStatus, setScanStatus] = useState('')
+  const [dotsVisible, setDotsVisible] = useState(false)
+  const [dotsExiting, setDotsExiting] = useState(false)
   const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [conversations, setConversations] = useState<ConversationListItem[]>([])
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const prevStatusRef = useRef(status)
 
+  const isLoading = status === 'streaming' || status === 'submitted'
+
+  useEffect(() => { fetchConversations() }, [])
+
+  async function fetchConversations() {
+    try {
+      const res = await fetch('/api/conversations')
+      const data = await res.json()
+      if (Array.isArray(data)) setConversations(data)
+    } catch { /* ignore */ }
+  }
+
+  // Auto-save when streaming finishes
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    const wasStreaming = prevStatusRef.current === 'streaming' || prevStatusRef.current === 'submitted'
+    const isNowReady = status === 'ready'
+    prevStatusRef.current = status
+    if (wasStreaming && isNowReady && messages.length > 0) saveConversation()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
+
+  const saveConversation = useCallback(async () => {
+    if (messages.length === 0) return
+    const firstUser = messages.find(m => m.role === 'user')
+    const titlePart = firstUser?.parts.find(p => p.type === 'text')
+    const title = titlePart && 'text' in titlePart ? (titlePart.text as string).slice(0, 80) : 'New conversation'
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: conversationId || undefined, title, messages }),
+      })
+      const data = await res.json()
+      if (data.id && !conversationId) setConversationId(data.id)
+      fetchConversations()
+    } catch { /* ignore */ }
+  }, [messages, conversationId])
+
+  async function loadConversation(id: string) {
+    try {
+      const res = await fetch(`/api/conversations/${id}`)
+      const data = await res.json()
+      if (data.messages) { setMessages(data.messages); setConversationId(id) }
+    } catch { /* ignore */ }
+  }
+
+  function startNewConversation() { setMessages([]); setConversationId(null) }
+
+  async function deleteConversation(id: string) {
+    try {
+      await fetch(`/api/conversations/${id}`, { method: 'DELETE' })
+      if (conversationId === id) startNewConversation()
+      fetchConversations()
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  // Dots enter/exit animation
+  useEffect(() => {
+    if (isLoading) {
+      setDotsExiting(false)
+      setDotsVisible(true)
+    } else if (dotsVisible) {
+      setDotsExiting(true)
+      const timer = setTimeout(() => {
+        setDotsVisible(false)
+        setDotsExiting(false)
+      }, 200)
+      return () => clearTimeout(timer)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading])
+
 
   function toggleScanner() {
     if (scanning) {
       if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
-      setScanning(false)
-      setScanStatus('Scanner stopped')
+      scanIntervalRef.current = null; setScanning(false); setScanStatus('Scanner stopped')
     } else {
-      setScanning(true)
-      setScanStatus('Scanner active — polling every 5 min')
-      runScan()
-      scanIntervalRef.current = setInterval(runScan, 5 * 60 * 1000)
+      setScanning(true); setScanStatus('Scanner active -- polling every 5 min')
+      runScan(); scanIntervalRef.current = setInterval(runScan, 5 * 60 * 1000)
     }
   }
 
@@ -172,257 +437,126 @@ export default function AutovalPage() {
       setScanStatus('Scanning...')
       const res = await fetch('/api/eval/scan', { method: 'POST' })
       const data = await res.json()
-      if (data.status === 'idle') {
-        setScanStatus('No unscored logs found — waiting...')
-      } else if (data.status === 'completed') {
-        setScanStatus(`Found ${data.rows_scanned} issue(s) — run ${data.run_id?.slice(0, 8)}`)
-      } else {
-        setScanStatus(`Scan error: ${data.message}`)
-      }
-    } catch {
-      setScanStatus('Scan failed — will retry')
-    }
-  }
-
-  async function handleSend() {
-    if (!input.trim() || loading) return
-    const userMessage = input.trim()
-    setInput('')
-    setLoading(true)
-
-    // Add user message
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
-
-    // Build history for the API
-    const history = messages
-      .filter((m) => m.content)
-      .map((m) => ({
-        role: m.role === 'user' ? 'user' as const : 'model' as const,
-        content: m.content!,
-      }))
-
-    // Start agent message with empty steps
-    const agentMsgIndex = messages.length + 1
-    setMessages((prev) => [...prev, { role: 'agent', steps: [], content: '' }])
-
-    try {
-      const res = await fetch('/api/eval/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, history }),
-      })
-
-      if (!res.ok || !res.body) throw new Error('Agent error')
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const data = JSON.parse(line.slice(6))
-
-          if (data.type === 'text') {
-            setMessages((prev) => {
-              const updated = [...prev]
-              const msg = updated[agentMsgIndex]
-              if (msg) msg.content = (msg.content || '') + data.content
-              return updated
-            })
-          } else if (data.type === 'done') {
-            // Agent finished
-          } else if (data.type === 'error') {
-            setMessages((prev) => {
-              const updated = [...prev]
-              const msg = updated[agentMsgIndex]
-              if (msg) msg.content = `Error: ${data.content}`
-              return updated
-            })
-          } else if (data.tool_name) {
-            // It's a step — dedup consecutive same-name+same-duration
-            setMessages((prev) => {
-              const updated = [...prev]
-              const msg = updated[agentMsgIndex]
-              if (msg) {
-                const existing = msg.steps || []
-                const last = existing[existing.length - 1]
-                const step = data as EvalStep
-                if (last && last.tool_name === step.tool_name && last.duration_ms === step.duration_ms) {
-                  return prev // skip duplicate
-                }
-                msg.steps = [...existing, step]
-              }
-              return updated
-            })
-          }
-        }
-      }
-    } catch (err) {
-      setMessages((prev) => {
-        const updated = [...prev]
-        const msg = updated[agentMsgIndex]
-        if (msg) msg.content = `Error: ${err instanceof Error ? err.message : 'Unknown error'}`
-        return updated
-      })
-    } finally {
-      setLoading(false)
-    }
+      if (data.status === 'idle') setScanStatus('No unscored logs found')
+      else if (data.status === 'completed') setScanStatus(`Found issues -- run ${data.run_id?.slice(0, 8)}`)
+      else setScanStatus(`Error: ${data.message}`)
+    } catch { setScanStatus('Scan failed') }
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col">
-      {/* Header */}
-      <div className="bg-white border-b border-[#e8e8e8] px-6 py-4 flex items-center gap-3">
-        <img src="/autovalai.png" alt="Autoval" className="h-[28px]" />
-        <span className="text-[12px] text-[#bbb] uppercase tracking-[0.05em]">Eval Agent</span>
-        <div className="flex-1" />
-        {scanStatus && (
-          <span className="text-[11px] text-[#999] mr-2">{scanStatus}</span>
-        )}
-        <button
-          onClick={toggleScanner}
-          className={`px-3 py-1.5 rounded-[6px] text-[12px] font-semibold mr-3 ${
-            scanning
-              ? 'bg-[#FFF5F5] text-[#C92A2A] border border-[#C92A2A]'
-              : 'bg-[#EBFBEE] text-[#2B8A3E] border border-[#2B8A3E]'
-          }`}
-        >
-          {scanning ? 'Stop Scanner' : 'Start Scanner'}
-        </button>
-        <a href="/dashboard" className="text-[13px] text-[#666] hover:text-[#111]">Dashboard</a>
-      </div>
+    <div className="h-screen bg-background flex overflow-hidden">
+        <Sidebar
+          conversations={conversations}
+          activeId={conversationId}
+          onSelect={loadConversation}
+          onNew={startNewConversation}
+          onDelete={deleteConversation}
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          scanStatus={scanStatus}
+          scanning={scanning}
+          onToggleScanner={toggleScanner}
+        />
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 max-w-[700px] mx-auto w-full">
-        {messages.length === 0 && (
-          <div className="text-center py-20">
-            <img src="/autovalai.png" alt="Autoval" className="h-[80px] mx-auto mb-4" />
-            <p className="text-[14px] text-[#999]">
-              Ask me to check a log entry, scan for issues, or investigate a problem.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2 justify-center">
-              {[
-                'Check the last few requests for issues',
-                'Scan logs from the last 10 minutes',
-                'Why did we recommend aspirin to someone on warfarin?',
-              ].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => setInput(suggestion)}
-                  className="px-3 py-2 rounded-[8px] border border-[#e8e8e8] text-[13px] text-[#666] hover:border-[#111] hover:text-[#111] transition-colors"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-            <div className="mt-16">
-              <p className="text-[11px] uppercase tracking-[0.1em] text-[#ccc] mb-5">Powered by</p>
-              <div className="flex items-center justify-center gap-10">
-                <a href="https://clickhouse.com" target="_blank" rel="noopener"><img src="/clickhouse-small.png" alt="ClickHouse" className="h-[36px] object-contain opacity-50 hover:opacity-80 transition-opacity" /></a>
-                <a href="https://datadoghq.com" target="_blank" rel="noopener"><img src="/datadog.png" alt="Datadog" className="h-[36px] object-contain opacity-50 hover:opacity-80 transition-opacity" /></a>
-                <a href="https://nimbleway.com" target="_blank" rel="noopener"><img src="/nimble.png" alt="Nimble" className="h-[36px] object-contain opacity-50 hover:opacity-80 transition-opacity" /></a>
-                <a href="https://deepmind.google/technologies/gemini" target="_blank" rel="noopener"><img src="/gemini.png" alt="Gemini" className="h-[36px] object-contain opacity-50 hover:opacity-80 transition-opacity" /></a>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {messages.map((msg, i) => (
-          <div key={i}>
-            {msg.role === 'user' ? (
-              <div className="flex justify-end">
-                <div className="bg-[#111] text-white px-4 py-3 rounded-[12px] rounded-br-[4px] max-w-[80%] text-[14px]">
-                  {msg.content}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
+            {messages.length === 0 && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center max-w-md">
+                  <img src="/logo.svg" alt="Autoval" className="h-12 mx-auto mb-4" />
+                  <h1 className="text-2xl font-semibold text-foreground mb-2">Autoval</h1>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Scan production logs, judge LLM outputs, generate safety rules, and ship fixes.
+                  </p>
+                  <div className="space-y-2">
+                    {[
+                      'Check the last few requests for issues',
+                      'Scan logs from the last 10 minutes',
+                      'Why did we recommend aspirin to someone on warfarin?',
+                    ].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setInput(s)}
+                        className="block w-full text-left px-4 py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {/* Tool call steps — group eval pipeline tools */}
-                {(() => {
-                  if (!msg.steps) return null
-                  const groups: (EvalStep | EvalStep[])[] = []
-                  let evalBatch: EvalStep[] = []
+            )}
 
-                  for (const step of msg.steps) {
-                    if (EVAL_PIPELINE_TOOLS.has(step.tool_name)) {
-                      evalBatch.push(step)
-                    } else {
-                      if (evalBatch.length > 0) {
-                        groups.push(evalBatch)
-                        evalBatch = []
-                      }
-                      groups.push(step)
-                    }
-                  }
-                  if (evalBatch.length > 0) groups.push(evalBatch)
-
-                  return groups.map((item, j) =>
-                    Array.isArray(item) ? (
-                      <EvalPipelineGroup key={`grp-${j}`} steps={item} />
-                    ) : (
-                      <StepCard key={j} step={item} />
-                    )
-                  )
-                })()}
-                {/* Text response */}
-                {/* PR link from create_pull_request step */}
-                {msg.steps?.some((s) => s.tool_name === 'create_pull_request') && (() => {
-                  const prStep = msg.steps!.find((s) => s.tool_name === 'create_pull_request')
-                  const prUrl = (prStep?.tool_result as Record<string, unknown>)?.pr_url as string | undefined
-                  return prUrl ? (
-                    <a href={prUrl} target="_blank" rel="noopener" className="flex items-center gap-2 px-4 py-3 bg-[#EBFBEE] border border-[#2B8A3E] rounded-[8px] text-[14px] text-[#2B8A3E] font-semibold hover:bg-[#d3f9d8] transition-colors">
-                      🚀 Pull Request Created → {prUrl.split('/').pop()}
-                    </a>
-                  ) : null
-                })()}
-                {/* Text response */}
-                {msg.content && (
-                  <div className="bg-white border border-[#e8e8e8] px-4 py-3 rounded-[12px] rounded-bl-[4px] max-w-[80%] text-[14px] text-[#333] leading-relaxed">
-                    {msg.content}
-                  </div>
-                )}
-                {/* Loading indicator */}
-                {loading && i === messages.length - 1 && !msg.content && (
-                  <div className="flex items-center gap-2 px-4 py-2 text-[13px] text-[#999]">
-                    <div className="w-[6px] h-[6px] rounded-full bg-[#111] animate-pulse" />
-                    Thinking...
-                  </div>
-                )}
+            {messages.length > 0 && (
+              <div className="max-w-[800px] mx-auto">
+                {messages.map((msg) => (
+                  <MessageContent key={msg.id} message={msg} />
+                ))}
+                <div ref={bottomRef} />
               </div>
             )}
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
 
-      {/* Input */}
-      <div className="border-t border-[#e8e8e8] bg-white px-6 py-4">
-        <div className="max-w-[700px] mx-auto flex gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Ask Autoval to check logs, scan for issues, investigate a problem..."
-            className="flex-1 h-[44px] px-4 rounded-[8px] border border-[#e8e8e8] text-[14px] outline-none focus:border-[#111] placeholder:text-[#ccc]"
-            disabled={loading}
-          />
-          <button
-            onClick={handleSend}
-            disabled={loading || !input.trim()}
-            className="h-[44px] px-6 rounded-[8px] bg-[#111] text-white text-[14px] font-semibold disabled:opacity-30"
-          >
-            Send
-          </button>
+            {messages.length === 0 && <div ref={bottomRef} />}
+          </div>
+
+          {/* Fade gradient above input */}
+          <div className="h-8 bg-gradient-to-t from-background to-transparent -mt-8 relative z-10 pointer-events-none" />
+
+          {/* Input */}
+          <div className="px-6 pb-4 pt-2 relative z-10">
+            <div className="max-w-[800px] mx-auto relative">
+              {/* Wave dots indicator */}
+              {dotsVisible && (
+                <div
+                  className="absolute -top-4 left-1 flex gap-[3px] items-center"
+                  style={{
+                    animation: dotsExiting ? 'dots-out 0.2s ease-out forwards' : 'dots-in 0.15s ease-out forwards',
+                  }}
+                >
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="w-[5px] h-[5px] rounded-full bg-foreground"
+                      style={{
+                        animation: dotsExiting ? 'none' : 'wave-dot 1.2s ease-in-out infinite',
+                        animationDelay: `${i * 0.15}s`,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            <div className="flex items-center gap-2 border border-border rounded-lg bg-card px-3 py-1.5 focus-within:border-foreground/20 transition-colors">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && input.trim() && !isLoading) {
+                    sendMessage({ text: input.trim() }); setInput('')
+                  }
+                }}
+                placeholder="Add a follow-up..."
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 h-8"
+                disabled={isLoading}
+              />
+              <span className="text-[10px] text-muted-foreground/50 shrink-0">Gemini 2.5 Flash</span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0"
+                disabled={isLoading || !input.trim()}
+                onClick={() => {
+                  if (input.trim() && !isLoading) {
+                    sendMessage({ text: input.trim() }); setInput('')
+                  }
+                }}
+              >
+                <Send className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
   )
 }

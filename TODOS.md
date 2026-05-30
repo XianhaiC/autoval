@@ -71,13 +71,13 @@
 - npm package: https://www.npmjs.com/package/autoval
 
 ## Running locally
-- Autoval: `cd /Users/xianhaic/projects/hackathon/autoval && rm -rf .next && DD_SITE=us5.datadoghq.com DD_LLMOBS_ENABLED=1 DD_LLMOBS_AGENTLESS_ENABLED=1 DD_LLMOBS_ML_APP=autoval DD_API_KEY=9cfb4992b4e9809df913f19a1b870412 NODE_OPTIONS="--import dd-trace/initialize.mjs" yarn dev -p 3003`
+- Autoval: `cd /Users/xianhaic/projects/hackathon/autoval && rm -rf .next && DD_SITE=us5.datadoghq.com DD_LLMOBS_ENABLED=1 DD_LLMOBS_AGENTLESS_ENABLED=1 DD_LLMOBS_ML_APP=autoval DD_API_KEY=$DD_API_KEY NODE_OPTIONS="--import dd-trace/initialize.mjs" yarn dev -p 3003`
 - Guardia: `cd /Users/xianhaic/projects/hackathon/Fordham-Hackathon/frontend && yarn dev -p 3004`
 - Always nuke `.next` before restart (stale webpack cache is a recurring issue)
 
 ## Env vars needed (.env.local)
 - `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `GEMINI_API_KEY`
+- `GOOGLE_GENERATIVE_AI_API_KEY`
 - `CLICKHOUSE_URL` + `CLICKHOUSE_USER` + `CLICKHOUSE_PASSWORD` + `CLICKHOUSE_DATABASE`
 - `NIMBLE_API_KEY`
 - `GITHUB_TOKEN` + `GITHUB_OWNER` + `GITHUB_REPO` + `GITHUB_BASE_PATH`

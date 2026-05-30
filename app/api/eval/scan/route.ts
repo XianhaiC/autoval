@@ -1,6 +1,8 @@
 export const runtime = 'nodejs'
 
-import { runEvalAgent, EvalStep } from '@/lib/evalAgent'
+import { generateText, stepCountIs } from 'ai'
+import { google } from '@ai-sdk/google'
+import { SYSTEM_PROMPT, agentTools, EvalStep } from '@/lib/evalAgent'
 import { createRun, insertStep, completeRun } from '@/lib/persistRun'
 
 export async function POST() {
@@ -9,20 +11,34 @@ export async function POST() {
   try {
     const summaries: string[] = []
 
-    for await (const step of runEvalAgent('Scan recent logs for quality issues and investigate any problems you find.', [])) {
-      if ('tool_name' in step) {
-        const evalStep = step as EvalStep
-        await insertStep(runId, evalStep)
+    const result = await generateText({
+      model: google('gemini-2.5-flash'),
+      system: SYSTEM_PROMPT,
+      prompt: 'Scan recent logs for quality issues and investigate any problems you find.',
+      tools: agentTools,
+      stopWhen: stepCountIs(50),
+      onStepFinish: async ({ toolResults }) => {
+        if (!toolResults) return
+        for (const tr of toolResults) {
+          const step: EvalStep = {
+            tool_name: tr.toolName,
+            tool_args: tr.input as Record<string, unknown>,
+            tool_result: tr.output,
+            duration_ms: 0,
+            timestamp: new Date().toISOString(),
+          }
+          await insertStep(runId, step)
 
-        if (evalStep.tool_name === 'complete_run') {
-          const summary = (evalStep.tool_args as Record<string, unknown>)?.summary
-          if (summary) summaries.push(summary as string)
+          if (tr.toolName === 'complete_run') {
+            const summary = (tr.input as Record<string, unknown>)?.summary
+            if (summary) summaries.push(summary as string)
+          }
         }
-      }
-    }
+      },
+    })
 
     await completeRun(runId, {
-      summary: summaries.join('\n') || 'Auto scan completed',
+      summary: summaries.join('\n') || result.text || 'Auto scan completed',
     })
 
     return Response.json({ status: 'completed', run_id: runId, summary: summaries.join('\n') })

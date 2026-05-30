@@ -1,7 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { generateText } from 'ai'
+import { google } from '@ai-sdk/google'
 import { executeReadPrompt, executeReadEvals } from './createPR'
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 interface Assertion {
   type: string
@@ -29,10 +28,8 @@ export async function executeTestPromptFix(args: { full_prompt?: string; prompt_
   let newPrompt: string
 
   if (args.full_prompt) {
-    // Use the full prompt directly
     newPrompt = args.full_prompt
   } else if (args.prompt_addition) {
-    // Legacy: append to current prompt
     const promptResult = await executeReadPrompt()
     const currentPrompt = 'content' in promptResult ? promptResult.content : ''
     newPrompt = currentPrompt + '\n\n' + args.prompt_addition
@@ -53,21 +50,20 @@ export async function executeTestPromptFix(args: { full_prompt?: string; prompt_
     }
   }
 
-  // 3. Run each eval
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+  // 3. Run each eval using Vercel AI SDK
   const details: EvalResult[] = []
 
   for (const rule of evals) {
-    // Support both formats: test_input (ours) or input (Daniel's)
     const testInput = rule.test_input || rule.input
     if (!testInput) continue
 
     try {
-      const result = await model.generateContent({
-        systemInstruction: newPrompt,
-        contents: [{ role: 'user', parts: [{ text: testInput }] }],
+      const result = await generateText({
+        model: google('gemini-2.5-flash'),
+        system: newPrompt,
+        prompt: testInput,
       })
-      const output = result.response.text().toLowerCase()
+      const output = result.text.toLowerCase()
 
       let passed = true
       const reasons: string[] = []

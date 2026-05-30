@@ -38,7 +38,7 @@ cp .env.local.example .env.local
 |----------|----------|-----------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project settings |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase project settings |
-| `GEMINI_API_KEY` | Yes | [Google AI Studio](https://aistudio.google.com/apikey) |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Yes | [Google AI Studio](https://aistudio.google.com/apikey) |
 | `GITHUB_TOKEN` | Yes | [GitHub Settings > Tokens](https://github.com/settings/tokens) (needs `repo` scope) |
 | `GITHUB_OWNER` | Yes | Owner of the target app repo (e.g. `dabomb1004`) |
 | `GITHUB_REPO` | Yes | Target app repo name (e.g. `Hackathon-Template`) |
